@@ -13,6 +13,8 @@ from icenet.core.config import Config
 from icenet.training.trainer import Trainer
 from icenet.ui.app import run_ui
 from icenet.utils.updater import check_for_updates, install_update
+from icenet.chat import run_chat_loop
+from icenet.data.local_loader import LocalFileLoader
 
 
 # Setup logging
@@ -156,6 +158,88 @@ def cmd_config(args):
     logger.info(f"Sample config saved to: {output_path}")
 
 
+def cmd_train_local(args):
+    """Train on local files - Simple, no-config-needed training"""
+    print("\n" + "=" * 60)
+    print("IceNet Local File Training")
+    print("=" * 60 + "\n")
+
+    # Load files
+    print(f"📂 Scanning files in: {args.path}")
+    loader = LocalFileLoader(
+        root_path=args.path,
+        recursive=not args.no_recursive,
+        max_file_size_mb=args.max_file_size,
+    )
+
+    # Get statistics
+    files = loader.scan_files()
+    stats = loader.get_statistics(files)
+
+    print(f"\n📊 Dataset Statistics:")
+    print(f"  Total files: {stats['total_files']}")
+    print(f"  Total size: {stats['total_size_mb']:.2f} MB")
+    print(f"\n  Files by type:")
+    for ext, count in sorted(stats['by_extension'].items(), key=lambda x: x[1], reverse=True):
+        print(f"    {ext}: {count} files")
+
+    # Confirm
+    if not args.yes:
+        response = input(f"\n⚡ Train on these {stats['total_files']} files? (y/n): ")
+        if response.lower() != 'y':
+            print("Training cancelled.")
+            return
+
+    # Load data
+    print("\n📖 Loading file contents...")
+    chunks = loader.load_as_chunks(
+        chunk_size=args.chunk_size,
+        overlap=args.overlap
+    )
+    print(f"✓ Created {len(chunks)} training chunks")
+
+    # Save processed data
+    output_dir = Path(args.output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    data_file = output_dir / "training_data.txt"
+    print(f"\n💾 Saving training data to: {data_file}")
+
+    with open(data_file, 'w', encoding='utf-8') as f:
+        for chunk in chunks:
+            f.write(chunk + "\n\n---\n\n")
+
+    print(f"✓ Saved {len(chunks)} chunks")
+
+    # Save metadata
+    import json
+    metadata_file = output_dir / "metadata.json"
+    with open(metadata_file, 'w') as f:
+        json.dump({
+            'source_path': str(args.path),
+            'total_files': stats['total_files'],
+            'total_chunks': len(chunks),
+            'chunk_size': args.chunk_size,
+            'statistics': stats,
+        }, f, indent=2)
+
+    print(f"\n{'=' * 60}")
+    print("✓ Training data prepared successfully!")
+    print(f"{'=' * 60}")
+    print(f"\nData saved to: {output_dir}")
+    print(f"\n💡 Next steps:")
+    print(f"  1. Your data is ready for training")
+    print(f"  2. Start chatting: icenet chat")
+    print(f"     (Note: Full model training coming in future update)")
+    print()
+
+
+def cmd_chat(args):
+    """Start a chat session"""
+    model_path = args.model if hasattr(args, 'model') and args.model else None
+    run_chat_loop(model_path=model_path)
+
+
 def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
@@ -212,6 +296,63 @@ def main():
         "--output", "-o", default="config.yaml", help="Output path"
     )
     parser_config.set_defaults(func=cmd_config)
+
+    # Train-local command (simple, no-config training)
+    parser_train_local = subparsers.add_parser(
+        "train-local",
+        help="Train on your local files (no technical skills needed!)",
+        aliases=["local", "learn"]
+    )
+    parser_train_local.add_argument(
+        "path",
+        help="Path to directory with your files (e.g., ~/Documents)"
+    )
+    parser_train_local.add_argument(
+        "--output", "-o",
+        default="~/icenet/training",
+        help="Where to save training data (default: ~/icenet/training)"
+    )
+    parser_train_local.add_argument(
+        "--chunk-size",
+        type=int,
+        default=1000,
+        help="Size of training chunks (default: 1000)"
+    )
+    parser_train_local.add_argument(
+        "--overlap",
+        type=int,
+        default=100,
+        help="Overlap between chunks (default: 100)"
+    )
+    parser_train_local.add_argument(
+        "--max-file-size",
+        type=float,
+        default=10.0,
+        help="Max file size in MB (default: 10)"
+    )
+    parser_train_local.add_argument(
+        "--no-recursive",
+        action="store_true",
+        help="Don't scan subdirectories"
+    )
+    parser_train_local.add_argument(
+        "--yes", "-y",
+        action="store_true",
+        help="Skip confirmation prompt"
+    )
+    parser_train_local.set_defaults(func=cmd_train_local)
+
+    # Chat command
+    parser_chat = subparsers.add_parser(
+        "chat",
+        help="Chat with IceNet AI",
+        aliases=["talk", "ask"]
+    )
+    parser_chat.add_argument(
+        "--model", "-m",
+        help="Path to trained model (optional)"
+    )
+    parser_chat.set_defaults(func=cmd_chat)
 
     # Parse arguments
     args = parser.parse_args()
