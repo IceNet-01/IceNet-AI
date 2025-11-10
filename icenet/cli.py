@@ -199,7 +199,7 @@ def cmd_train_local(args):
     print(f"✓ Created {len(chunks)} training chunks")
 
     # Save processed data
-    output_dir = Path(args.output)
+    output_dir = Path(args.output).expanduser()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     data_file = output_dir / "training_data.txt"
@@ -235,13 +235,16 @@ def cmd_train_local(args):
     print(f"\n   I'll answer questions by searching your files!")
     print(f"   Ask me anything about your documents.\n")
     print(f"💾 Data saved to: {output_dir}")
+    print(f"   (Chat will automatically load from this location)")
     print()
 
 
 def cmd_chat(args):
     """Start a chat session"""
     model_path = args.model if hasattr(args, 'model') and args.model else None
-    run_chat_loop(model_path=model_path)
+    # Use the same default path as train-local
+    data_dir = str(Path("~/icenet/training").expanduser())
+    run_chat_loop(model_path=model_path, data_dir=data_dir)
 
 
 def main():

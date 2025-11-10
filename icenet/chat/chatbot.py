@@ -38,7 +38,9 @@ class SimpleChatbot:
         self.conversation_history: List[Dict[str, str]] = []
 
         # Use retrieval chatbot by default (works immediately!)
-        self.retrieval_bot = RetrievalChatbot(data_dir=data_dir)
+        # Ensure path is expanded
+        expanded_dir = str(Path(data_dir).expanduser())
+        self.retrieval_bot = RetrievalChatbot(data_dir=expanded_dir)
 
         if model_path and Path(model_path).exists():
             self.load_model(model_path)
