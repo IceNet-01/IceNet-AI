@@ -6,6 +6,7 @@ import torch
 from typing import Optional, List, Dict
 import logging
 from pathlib import Path
+from icenet.chat.retrieval import RetrievalChatbot
 
 logger = logging.getLogger(__name__)
 
@@ -18,14 +19,16 @@ class SimpleChatbot:
         model_path: Optional[str] = None,
         max_length: int = 512,
         temperature: float = 0.7,
+        data_dir: str = "~/icenet/training",
     ):
         """
         Initialize chatbot
 
         Args:
-            model_path: Path to trained model checkpoint
+            model_path: Path to trained model checkpoint (optional)
             max_length: Maximum response length
             temperature: Sampling temperature (higher = more creative)
+            data_dir: Directory with training data for retrieval
         """
         self.model_path = model_path
         self.max_length = max_length
@@ -33,6 +36,9 @@ class SimpleChatbot:
         self.model = None
         self.tokenizer = None
         self.conversation_history: List[Dict[str, str]] = []
+
+        # Use retrieval chatbot by default (works immediately!)
+        self.retrieval_bot = RetrievalChatbot(data_dir=data_dir)
 
         if model_path and Path(model_path).exists():
             self.load_model(model_path)
@@ -59,16 +65,14 @@ class SimpleChatbot:
         Returns:
             Chatbot response
         """
-        # Add to conversation history
+        # Use retrieval bot (works immediately with your data!)
+        response = self.retrieval_bot.chat(user_input)
+
+        # Also add to our history
         self.conversation_history.append({
             "role": "user",
             "content": user_input
         })
-
-        # Generate response
-        response = self._generate_response(user_input)
-
-        # Add response to history
         self.conversation_history.append({
             "role": "assistant",
             "content": response
@@ -124,6 +128,7 @@ This will teach me about your data so I can answer questions!"""
     def clear_history(self):
         """Clear conversation history"""
         self.conversation_history = []
+        self.retrieval_bot.clear_history()
 
     def get_history(self) -> List[Dict[str, str]]:
         """Get conversation history"""
@@ -139,24 +144,30 @@ This will teach me about your data so I can answer questions!"""
         logger.info(f"Conversation saved to {output_path}")
 
 
-def run_chat_loop(model_path: Optional[str] = None):
+def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/training"):
     """
     Run interactive chat loop
 
     Args:
         model_path: Optional path to trained model
+        data_dir: Directory with training data
     """
     print("\n" + "=" * 60)
-    print("IceNet AI Chatbot")
+    print("IceNet AI Chatbot - Chat About Your Files!")
     print("=" * 60)
 
-    chatbot = SimpleChatbot(model_path=model_path)
+    chatbot = SimpleChatbot(model_path=model_path, data_dir=data_dir)
 
-    if model_path and Path(model_path).exists():
-        print(f"✓ Loaded model from: {model_path}")
+    # Check if we have training data
+    stats = chatbot.retrieval_bot.get_stats()
+
+    if stats['has_data']:
+        print(f"✓ Ready to chat! I have data from {stats['metadata'].get('total_files', '?')} files")
+        print(f"  ({stats['chunks_loaded']} chunks loaded)")
     else:
-        print("⚠ No trained model loaded - using fallback responses")
-        print("  Train a model first with: icenet train-local /path/to/files")
+        print("⚠ No training data found!")
+        print("  Train me first with: icenet train-local /path/to/files")
+        print("  For example: icenet train-local ~/Documents")
 
     print("\nType 'exit' or 'quit' to end the conversation")
     print("Type 'clear' to clear conversation history")

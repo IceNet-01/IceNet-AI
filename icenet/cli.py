@@ -224,13 +224,17 @@ def cmd_train_local(args):
         }, f, indent=2)
 
     print(f"\n{'=' * 60}")
-    print("✓ Training data prepared successfully!")
+    print("✅ READY TO CHAT! Your files are processed!")
     print(f"{'=' * 60}")
-    print(f"\nData saved to: {output_dir}")
-    print(f"\n💡 Next steps:")
-    print(f"  1. Your data is ready for training")
-    print(f"  2. Start chatting: icenet chat")
-    print(f"     (Note: Full model training coming in future update)")
+    print(f"\n📊 What I learned:")
+    print(f"  • {stats['total_files']} files processed")
+    print(f"  • {len(chunks)} chunks created")
+    print(f"  • {stats['total_size_mb']:.2f} MB of data")
+    print(f"\n💬 Start chatting NOW:")
+    print(f"  icenet chat")
+    print(f"\n   I'll answer questions by searching your files!")
+    print(f"   Ask me anything about your documents.\n")
+    print(f"💾 Data saved to: {output_dir}")
     print()
 
 
