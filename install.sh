@@ -58,48 +58,9 @@ fi
 echo -e "${GREEN}Python $PYTHON_VERSION found${NC}"
 echo ""
 
-# Check if virtual environment should be created
-echo "Installation options:"
-echo "1. Install in virtual environment (recommended)"
-echo "2. Install system-wide"
-read -p "Choose option (1 or 2): " -n 1 -r
-#echo ""
-
-if [[ $REPLY == "1" ]]; then
-    VENV_PATH="$HOME/.icenet-venv"
-
-    echo "Creating virtual environment at $VENV_PATH..."
-    python3 -m venv "$VENV_PATH"
-
-    # Activate virtual environment
-    source "$VENV_PATH/bin/activate"
-
-    echo -e "${GREEN}Virtual environment created and activated${NC}"
-    echo ""
-
-    # Add activation to shell profile
-    SHELL_PROFILE=""
-    if [ -f "$HOME/.zshrc" ]; then
-        SHELL_PROFILE="$HOME/.zshrc"
-    elif [ -f "$HOME/.bashrc" ]; then
-        SHELL_PROFILE="$HOME/.bashrc"
-    elif [ -f "$HOME/.bash_profile" ]; then
-        SHELL_PROFILE="$HOME/.bash_profile"
-    fi
-
-    if [ -n "$SHELL_PROFILE" ]; then
-        echo "Do you want to add IceNet activation to $SHELL_PROFILE?"
-        read -p "(y/n): " -n 1 -r
-        echo ""
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo "" >> "$SHELL_PROFILE"
-            echo "# IceNet AI" >> "$SHELL_PROFILE"
-            echo "alias icenet-activate='source $VENV_PATH/bin/activate'" >> "$SHELL_PROFILE"
-            echo -e "${GREEN}Added 'icenet-activate' alias to $SHELL_PROFILE${NC}"
-            echo "Run 'icenet-activate' in new terminal sessions to activate IceNet"
-        fi
-    fi
-fi
+# Installing system-wide
+echo "Installing IceNet AI system-wide..."
+echo ""
 
 # Upgrade pip
 echo "Upgrading pip..."
