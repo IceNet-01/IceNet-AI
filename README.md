@@ -21,13 +21,13 @@ A powerful, easy-to-use AI system optimized for Apple M4 Pro with a beautiful te
 ## Quick Installation
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/your-repo/IceNet-AI/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/IceNet-01/IceNet-AI/main/install.sh | bash
 ```
 
 Or manual installation:
 
 ```bash
-git clone https://github.com/your-repo/IceNet-AI.git
+git clone https://github.com/IceNet-01/IceNet-AI.git
 cd IceNet-AI
 ./install.sh
 ```

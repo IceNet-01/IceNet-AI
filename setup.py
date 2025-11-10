@@ -17,7 +17,7 @@ setup(
     description="A powerful AI system optimized for Apple M4 Pro",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/your-repo/IceNet-AI",
+    url="https://github.com/IceNet-01/IceNet-AI",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 4 - Beta",

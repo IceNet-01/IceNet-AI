@@ -7,7 +7,7 @@ Thank you for your interest in contributing to IceNet AI!
 1. Fork the repository
 2. Clone your fork:
    ```bash
-   git clone https://github.com/your-username/IceNet-AI.git
+   git clone https://github.com/YOUR-USERNAME/IceNet-AI.git
    cd IceNet-AI
    ```
 

@@ -14,7 +14,7 @@ from icenet import __version__
 
 logger = logging.getLogger(__name__)
 
-GITHUB_REPO = "your-username/IceNet-AI"  # Update with actual repo
+GITHUB_REPO = "IceNet-01/IceNet-AI"
 UPDATE_CHECK_URL = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
 
 

@@ -7,13 +7,13 @@ Get started with IceNet AI in minutes!
 ### Easy Install (macOS)
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/your-repo/IceNet-AI/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/IceNet-01/IceNet-AI/main/install.sh | bash
 ```
 
 ### Manual Install
 
 ```bash
-git clone https://github.com/your-repo/IceNet-AI.git
+git clone https://github.com/IceNet-01/IceNet-AI.git
 cd IceNet-AI
 ./install.sh
 ```
@@ -177,8 +177,8 @@ pip install --upgrade --force-reinstall icenet-ai
 
 ## Getting Help
 
-- Issues: https://github.com/your-repo/IceNet-AI/issues
-- Discussions: https://github.com/your-repo/IceNet-AI/discussions
-- Documentation: https://github.com/your-repo/IceNet-AI/docs
+- Issues: https://github.com/IceNet-01/IceNet-AI/issues
+- Discussions: https://github.com/IceNet-01/IceNet-AI/discussions
+- Documentation: https://github.com/IceNet-01/IceNet-AI/docs
 
 Happy training! 🚀

@@ -232,7 +232,7 @@ class IceNetApp(App):
                             "  3. Enter config path\n"
                             "  4. Click 'Start Training'\n\n"
                             "For more information, visit:\n"
-                            "  https://github.com/your-repo/IceNet-AI"
+                            "  https://github.com/IceNet-01/IceNet-AI"
                         )
 
                 # Log panel at bottom
