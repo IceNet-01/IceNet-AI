@@ -2,6 +2,7 @@
 
 # IceNet AI Installation Script for macOS
 # Optimized for Apple Silicon (M1, M2, M3, M4)
+# Version: 1.0.1 - Cache cleared
 
 set -e
 
