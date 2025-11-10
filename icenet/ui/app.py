@@ -11,7 +11,7 @@ from textual.widgets import (
     Button,
     Label,
     Input,
-    TextLog,
+    RichLog,
     DataTable,
     TabbedContent,
     TabPane,
@@ -58,7 +58,7 @@ class LogPanel(Static):
 
     def __init__(self):
         super().__init__()
-        self.log_content = TextLog()
+        self.log_content = RichLog()
 
     def compose(self) -> ComposeResult:
         yield self.log_content
