@@ -58,6 +58,16 @@ fi
 echo -e "${GREEN}Python $PYTHON_VERSION found${NC}"
 echo ""
 
+# Check for git
+echo "Checking for git..."
+if ! command -v git &> /dev/null; then
+    echo -e "${RED}Error: git is not installed${NC}"
+    echo "Please install git from https://git-scm.com/downloads"
+    exit 1
+fi
+echo -e "${GREEN}git found${NC}"
+echo ""
+
 # Installing system-wide
 echo "Installing IceNet AI system-wide..."
 echo ""
@@ -71,13 +81,26 @@ echo ""
 echo "Installing IceNet AI..."
 
 if [ -f "setup.py" ]; then
-    # Local installation (for development)
+    # Local installation (already in repository)
     echo "Installing from local source..."
     pip install -e .
 else
-    # Remote installation (for end users)
-    echo "Installing from PyPI..."
-    pip install icenet-ai
+    # Remote installation - clone from GitHub
+    echo "Cloning IceNet AI from GitHub..."
+    INSTALL_DIR="$HOME/.icenet-source"
+
+    if [ -d "$INSTALL_DIR" ]; then
+        echo "Removing existing installation directory..."
+        rm -rf "$INSTALL_DIR"
+    fi
+
+    git clone https://github.com/IceNet-01/IceNet-AI.git "$INSTALL_DIR"
+
+    echo "Installing from GitHub source..."
+    pip install "$INSTALL_DIR"
+
+    echo "Cleaning up..."
+    rm -rf "$INSTALL_DIR"
 fi
 
 # Verify installation
