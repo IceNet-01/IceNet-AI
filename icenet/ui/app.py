@@ -26,6 +26,8 @@ from datetime import datetime
 
 from icenet.core.engine import IceNetEngine
 from icenet.core.device import DeviceManager
+from icenet.data.local_loader import LocalFileLoader
+from icenet.chat.chatbot import SimpleChatbot
 
 
 logger = logging.getLogger(__name__)
@@ -153,6 +155,8 @@ class IceNetApp(App):
 
     BINDINGS = [
         Binding("q", "quit", "Quit"),
+        Binding("e", "tab_easy", "Easy Train"),
+        Binding("c", "tab_chat", "Chat"),
         Binding("t", "tab_train", "Train"),
         Binding("m", "tab_model", "Model"),
         Binding("s", "tab_settings", "Settings"),
@@ -165,6 +169,9 @@ class IceNetApp(App):
         super().__init__()
         self.device_manager = DeviceManager()
         self.engine = None
+        self.chatbot = SimpleChatbot()
+        self.file_loader = None
+        self.scanned_files = []
 
     def compose(self) -> ComposeResult:
         """Create child widgets"""
@@ -184,14 +191,50 @@ class IceNetApp(App):
                         yield Static("Welcome to IceNet AI", classes="section-title")
                         yield Static(
                             "A powerful AI system optimized for Apple M4 Pro\n\n"
+                            "🚀 NEW - No Technical Skills Needed!\n"
+                            "  • [e] Easy Train - Train on your files in seconds\n"
+                            "  • [c] Chat - Talk with your AI\n\n"
                             "Features:\n"
                             "  • Metal Performance Shaders (MPS) acceleration\n"
-                            "  • Easy training with YAML configs\n"
+                            "  • Train on ANY folder (documents, code, notes)\n"
                             "  • Multiple model architectures\n"
                             "  • Real-time monitoring\n\n"
-                            "Use tabs or keyboard shortcuts to navigate:\n"
-                            "  [t] Train   [m] Model   [s] Settings   [h] Help   [q] Quit"
+                            "Quick Start:\n"
+                            "  [e] Easy Train   [c] Chat   [t] Advanced   [h] Help   [q] Quit"
                         )
+
+                    # Easy Train tab (NEW!)
+                    with TabPane("Easy Train", id="tab-easy"):
+                        yield Static("🚀 Train on Your Files - No Tech Skills Needed!", classes="section-title")
+                        yield Static("Step 1: Choose a folder")
+                        yield Input(
+                            placeholder="e.g., /Users/you/Documents or ~/Desktop/MyNotes",
+                            id="easy-train-path"
+                        )
+                        yield Static("\nStep 2: Click to start!")
+                        yield Button("📂 Scan Files", id="scan-files", variant="primary")
+                        yield Button("⚡ Start Training", id="easy-train-start", variant="success")
+                        yield Static("\nWhat will happen:")
+                        yield Static(
+                            "  1. IceNet scans your folder for text files\n"
+                            "  2. Shows you what it found\n"
+                            "  3. Prepares training data automatically\n"
+                            "  4. Ready to chat about your documents!\n\n"
+                            "Supported files: .txt, .md, .py, .js, .html, and 25+ more!"
+                        )
+
+                    # Chat tab (NEW!)
+                    with TabPane("Chat", id="tab-chat"):
+                        yield Static("💬 Chat with IceNet AI", classes="section-title")
+                        yield Static(
+                            "Start a conversation! Type your message below.\n"
+                            "Note: Train on your files first for better responses!"
+                        )
+                        yield Input(placeholder="Type your message here...", id="chat-input")
+                        yield Button("Send", id="send-chat", variant="success")
+                        yield Static("\nConversation:", classes="section-title")
+                        yield RichLog(id="chat-log")
+                        yield Static("\nCommands: Type 'clear' to reset, 'exit' to quit chat")
 
                     # Train tab
                     with TabPane("Train", id="tab-train"):
@@ -224,11 +267,23 @@ class IceNetApp(App):
                         yield Static(
                             "Keyboard Shortcuts:\n"
                             "  q - Quit application\n"
-                            "  t - Switch to Train tab\n"
-                            "  m - Switch to Model tab\n"
-                            "  s - Switch to Settings tab\n"
-                            "  h - Switch to Help tab\n\n"
-                            "Training:\n"
+                            "  e - Easy Train (NEW! No tech skills needed)\n"
+                            "  c - Chat with IceNet AI (NEW!)\n"
+                            "  t - Advanced Train tab\n"
+                            "  m - Model tab\n"
+                            "  s - Settings tab\n"
+                            "  h - Help tab\n\n"
+                            "🚀 Easy Training (No Config Needed!):\n"
+                            "  1. Press 'e' to open Easy Train tab\n"
+                            "  2. Enter path to your folder (e.g., ~/Documents)\n"
+                            "  3. Click 'Scan Files' to see what's found\n"
+                            "  4. Click 'Start Training' to prepare data\n"
+                            "  5. Press 'c' to chat about your files!\n\n"
+                            "💬 Chatting:\n"
+                            "  1. Press 'c' to open Chat tab\n"
+                            "  2. Type your message and click 'Send'\n"
+                            "  3. Chat naturally with IceNet!\n\n"
+                            "Advanced Training:\n"
                             "  1. Create a YAML config file\n"
                             "  2. Go to Train tab (press 't')\n"
                             "  3. Enter config path\n"
@@ -297,6 +352,73 @@ class IceNetApp(App):
             log_panel.add_log(f"Saving model to: {model_path}", "info")
             # TODO: Implement model saving
 
+        elif button_id == "scan-files":
+            # Scan files for easy training
+            path_input = self.query_one("#easy-train-path", Input)
+            scan_path = path_input.value.strip()
+
+            if not scan_path:
+                log_panel.add_log("Please enter a folder path", "error")
+                return
+
+            # Expand ~ to home directory
+            from pathlib import Path
+            scan_path = str(Path(scan_path).expanduser())
+
+            log_panel.add_log(f"📂 Scanning files in: {scan_path}", "info")
+
+            try:
+                self.file_loader = LocalFileLoader(scan_path, recursive=True)
+                self.scanned_files = self.file_loader.scan_files()
+                stats = self.file_loader.get_statistics(self.scanned_files)
+
+                log_panel.add_log(f"✓ Found {stats['total_files']} files ({stats['total_size_mb']:.2f} MB)", "success")
+                log_panel.add_log(f"  Ready to train! Click 'Start Training' button.", "info")
+            except Exception as e:
+                log_panel.add_log(f"❌ Error scanning files: {e}", "error")
+
+        elif button_id == "easy-train-start":
+            # Start easy training
+            if not self.scanned_files:
+                log_panel.add_log("❌ Please scan files first!", "error")
+                return
+
+            log_panel.add_log("⚡ Preparing training data...", "info")
+
+            try:
+                chunks = self.file_loader.load_as_chunks(chunk_size=1000, overlap=100)
+                log_panel.add_log(f"✓ Created {len(chunks)} training chunks", "success")
+                log_panel.add_log("💾 Training data ready! (Full training coming soon)", "success")
+                log_panel.add_log("💡 Try the Chat tab to talk with IceNet!", "info")
+            except Exception as e:
+                log_panel.add_log(f"❌ Error preparing data: {e}", "error")
+
+        elif button_id == "send-chat":
+            # Send chat message
+            chat_input = self.query_one("#chat-input", Input)
+            user_message = chat_input.value.strip()
+
+            if not user_message:
+                return
+
+            # Get chat log
+            chat_log = self.query_one("#chat-log", RichLog)
+
+            # Show user message
+            user_text = Text(f"You: {user_message}", style="cyan")
+            chat_log.write(user_text)
+
+            # Get response from chatbot
+            response = self.chatbot.chat(user_message)
+
+            # Show bot response
+            bot_text = Text(f"IceNet: {response}", style="green")
+            chat_log.write(bot_text)
+            chat_log.write("")  # Empty line for spacing
+
+            # Clear input
+            chat_input.value = ""
+
     def action_tab_train(self) -> None:
         """Switch to train tab"""
         tabs = self.query_one(TabbedContent)
@@ -316,6 +438,23 @@ class IceNetApp(App):
         """Switch to help tab"""
         tabs = self.query_one(TabbedContent)
         tabs.active = "tab-help"
+
+    def action_tab_easy(self) -> None:
+        """Switch to easy train tab"""
+        tabs = self.query_one(TabbedContent)
+        tabs.active = "tab-easy"
+
+    def action_tab_chat(self) -> None:
+        """Switch to chat tab"""
+        tabs = self.query_one(TabbedContent)
+        tabs.active = "tab-chat"
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Handle Enter key in input fields"""
+        if event.input.id == "chat-input":
+            # Simulate clicking the send button
+            send_button = self.query_one("#send-chat", Button)
+            self.on_button_pressed(Button.Pressed(send_button))
 
 
 def run_ui():
