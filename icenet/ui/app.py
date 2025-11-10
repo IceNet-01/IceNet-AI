@@ -77,7 +77,8 @@ class LogPanel(Static):
         else:
             style = "white"
 
-        self.log_content.write(f"[{timestamp}] {message}", style=style)
+        text = Text(f"[{timestamp}] {message}", style=style)
+        self.log_content.write(text)
 
 
 class IceNetApp(App):
