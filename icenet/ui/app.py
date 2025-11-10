@@ -22,6 +22,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.console import RenderableType
 import logging
+from datetime import datetime
 
 from icenet.core.engine import IceNetEngine
 from icenet.core.device import DeviceManager
@@ -65,7 +66,7 @@ class LogPanel(Static):
 
     def add_log(self, message: str, level: str = "info"):
         """Add log message"""
-        timestamp = self.app.get_time()
+        timestamp = datetime.now().strftime("%H:%M:%S")
 
         if level == "error":
             style = "red"
