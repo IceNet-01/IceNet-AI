@@ -386,10 +386,36 @@ class IceNetApp(App):
             log_panel.add_log("⚡ Preparing training data...", "info")
 
             try:
+                import json
                 chunks = self.file_loader.load_as_chunks(chunk_size=1000, overlap=100)
-                log_panel.add_log(f"✓ Created {len(chunks)} training chunks", "success")
-                log_panel.add_log("💾 Training data ready! (Full training coming soon)", "success")
-                log_panel.add_log("💡 Try the Chat tab to talk with IceNet!", "info")
+                stats = self.file_loader.get_statistics(self.scanned_files)
+
+                # Save training data
+                output_dir = Path.home() / "icenet" / "training"
+                output_dir.mkdir(parents=True, exist_ok=True)
+
+                data_file = output_dir / "training_data.txt"
+                with open(data_file, 'w', encoding='utf-8') as f:
+                    for chunk in chunks:
+                        f.write(chunk + "\n\n---\n\n")
+
+                # Save metadata
+                metadata_file = output_dir / "metadata.json"
+                with open(metadata_file, 'w') as f:
+                    json.dump({
+                        'total_files': stats['total_files'],
+                        'total_chunks': len(chunks),
+                        'chunk_size': 1000,
+                        'statistics': stats,
+                    }, f, indent=2)
+
+                # Reload the chatbot with new data
+                from icenet.chat.retrieval import RetrievalChatbot
+                self.chatbot.retrieval_bot = RetrievalChatbot(str(output_dir))
+
+                log_panel.add_log(f"✅ READY! Processed {stats['total_files']} files ({len(chunks)} chunks)", "success")
+                log_panel.add_log("💬 Go to Chat tab and start asking questions!", "success")
+                log_panel.add_log("💾 Data saved for future sessions", "info")
             except Exception as e:
                 log_panel.add_log(f"❌ Error preparing data: {e}", "error")
 
