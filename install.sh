@@ -63,7 +63,7 @@ echo "Installation options:"
 echo "1. Install in virtual environment (recommended)"
 echo "2. Install system-wide"
 read -p "Choose option (1 or 2): " -n 1 -r
-echo ""
+#echo ""
 
 if [[ $REPLY == "1" ]]; then
     VENV_PATH="$HOME/.icenet-venv"
