@@ -1,0 +1,55 @@
+# IceNet CNN Configuration for Image Classification
+# Optimized for Apple M4 Pro
+
+model:
+  type: cnn
+  hidden_size: 512
+  num_layers: 5
+  num_heads: 8  # Not used for CNN
+  dropout: 0.2
+  vocab_size: 1000  # Number of classes
+  max_seq_length: 224  # Image size
+  activation: relu
+  use_mixed_precision: true
+  compile_model: false
+
+training:
+  batch_size: 64
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  epochs: 50
+  warmup_steps: 500
+  gradient_clip: 1.0
+  optimizer: adamw
+  scheduler: cosine
+  accumulation_steps: 1
+  eval_steps: 200
+  save_steps: 500
+  logging_steps: 50
+  mixed_precision: fp16
+  gradient_checkpointing: false
+
+data:
+  train_path: data/images/train
+  val_path: data/images/val
+  num_workers: 4
+  prefetch_factor: 2
+  pin_memory: true
+  shuffle: true
+
+system:
+  device: auto
+  seed: 42
+  deterministic: false
+  benchmark: true
+
+checkpoint:
+  output_dir: checkpoints/cnn_image
+  save_total_limit: 3
+  save_best_only: true
+  metric_for_best: loss
+
+logging:
+  log_dir: logs/cnn_image
+  use_tensorboard: true
+  use_wandb: false

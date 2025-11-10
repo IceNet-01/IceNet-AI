@@ -1,0 +1,55 @@
+# IceNet LSTM Configuration for Sequence Modeling
+# Optimized for Apple M4 Pro
+
+model:
+  type: lstm
+  hidden_size: 512
+  num_layers: 4
+  num_heads: 8  # Not used for LSTM
+  dropout: 0.3
+  vocab_size: 10000
+  max_seq_length: 256
+  activation: relu
+  use_mixed_precision: true
+  compile_model: false
+
+training:
+  batch_size: 64
+  learning_rate: 0.001
+  weight_decay: 0.00001
+  epochs: 30
+  warmup_steps: 500
+  gradient_clip: 5.0  # Higher for RNNs
+  optimizer: adam
+  scheduler: linear
+  accumulation_steps: 1
+  eval_steps: 300
+  save_steps: 1000
+  logging_steps: 100
+  mixed_precision: fp16
+  gradient_checkpointing: false
+
+data:
+  train_path: data/sequences/train
+  val_path: data/sequences/val
+  num_workers: 4
+  prefetch_factor: 2
+  pin_memory: true
+  shuffle: true
+
+system:
+  device: auto
+  seed: 42
+  deterministic: false
+  benchmark: true
+
+checkpoint:
+  output_dir: checkpoints/lstm_sequence
+  save_total_limit: 3
+  save_best_only: false
+  metric_for_best: loss
+
+logging:
+  log_dir: logs/lstm_sequence
+  use_tensorboard: true
+  use_wandb: false
