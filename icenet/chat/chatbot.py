@@ -12,6 +12,14 @@ from icenet.chat.retrieval import RetrievalChatbot
 
 logger = logging.getLogger(__name__)
 
+# Try to import clipboard support
+try:
+    import pyperclip
+    CLIPBOARD_AVAILABLE = True
+except ImportError:
+    CLIPBOARD_AVAILABLE = False
+    logger.debug("pyperclip not available - clipboard features disabled")
+
 
 class SimpleChatbot:
     """Simple chatbot that uses a trained model"""
@@ -196,6 +204,7 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
                 print(f"\n{BOLD}Commands:{RESET_COLOR}")
                 print(f"  {DIM}exit/quit{RESET_COLOR}  - End conversation")
                 print(f"  {DIM}clear{RESET_COLOR}      - Start fresh (clears history)")
+                print(f"  {DIM}copy{RESET_COLOR}       - Copy last AI response to clipboard")
                 print(f"  {DIM}save{RESET_COLOR}       - Save conversation manually")
                 print(f"  {DIM}list{RESET_COLOR}       - Show past conversations")
                 print(f"  {DIM}load <id>{RESET_COLOR}  - Resume a conversation\n")
@@ -206,6 +215,40 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
                 chatbot.retrieval_bot.clear_history()
                 chatbot.clear_history()
                 print("\n[Conversation history cleared]\n")
+                continue
+
+            elif user_input.lower() == 'copy':
+                # Copy last AI response to clipboard
+                history = chatbot.retrieval_bot.conversation_history
+                if not history:
+                    print("\n[No conversation yet - nothing to copy]\n")
+                    continue
+
+                # Find last assistant message
+                last_response = None
+                for msg in reversed(history):
+                    if msg['role'] == 'assistant':
+                        last_response = msg['content']
+                        break
+
+                if not last_response:
+                    print("\n[No AI response to copy yet]\n")
+                    continue
+
+                if not CLIPBOARD_AVAILABLE:
+                    print(f"\n[Clipboard not available - install with: pip install pyperclip]\n")
+                    print(f"Last response:\n{'-' * 60}\n{last_response}\n{'-' * 60}\n")
+                    continue
+
+                try:
+                    pyperclip.copy(last_response)
+                    # Show preview of what was copied
+                    preview = last_response[:100] + "..." if len(last_response) > 100 else last_response
+                    print(f"\n✓ Copied to clipboard ({len(last_response)} characters)")
+                    print(f"{DIM}Preview: {preview}{RESET_COLOR}\n")
+                except Exception as e:
+                    print(f"\n[Failed to copy to clipboard: {e}]\n")
+                    logger.error(f"Clipboard error: {e}")
                 continue
 
             elif user_input.lower() == 'save':
