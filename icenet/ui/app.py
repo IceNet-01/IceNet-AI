@@ -28,6 +28,7 @@ from icenet.core.engine import IceNetEngine
 from icenet.core.device import DeviceManager
 from icenet.data.local_loader import LocalFileLoader
 from icenet.chat.chatbot import SimpleChatbot
+from icenet.chat.ollama_manager import OllamaManager
 
 
 logger = logging.getLogger(__name__)
@@ -157,6 +158,7 @@ class IceNetApp(App):
         Binding("q", "quit", "Quit"),
         Binding("e", "tab_easy", "Easy Train"),
         Binding("c", "tab_chat", "Chat"),
+        Binding("a", "tab_ai", "AI Setup"),
         Binding("t", "tab_train", "Train"),
         Binding("m", "tab_model", "Model"),
         Binding("s", "tab_settings", "Settings"),
@@ -172,6 +174,7 @@ class IceNetApp(App):
         self.chatbot = SimpleChatbot()
         self.file_loader = None
         self.scanned_files = []
+        self.ollama_manager = OllamaManager()
 
     def compose(self) -> ComposeResult:
         """Create child widgets"""
@@ -236,6 +239,35 @@ class IceNetApp(App):
                         yield RichLog(id="chat-log")
                         yield Static("\nCommands: Type 'clear' to reset, 'exit' to quit chat")
 
+                    # AI Setup tab (NEW!)
+                    with TabPane("AI Setup", id="tab-ai"):
+                        yield Static("🤖 AI Setup - Make Responses SMART!", classes="section-title")
+                        yield Static(
+                            "Setup Ollama for intelligent AI-powered responses.\n"
+                            "100% free, runs locally on your Mac, completely private!"
+                        )
+                        yield Static("\n🎯 Step 1: Install Ollama")
+                        yield Button("📥 Setup Ollama (Automatic!)", id="setup-ollama-btn", variant="primary")
+                        yield Static(
+                            "\n✨ What this does:\n"
+                            "  • Auto-installs Ollama via Homebrew\n"
+                            "  • Downloads AI model (llama3.2)\n"
+                            "  • Starts server automatically\n"
+                            "  • Makes chat responses intelligent!"
+                        )
+                        yield Static("\n🎓 Step 2: Fine-Tune on YOUR Data")
+                        yield Input(placeholder="Model name (e.g., my-assistant)", id="finetune-name")
+                        yield Button("🔧 Fine-Tune Model", id="finetune-btn", variant="success")
+                        yield Static(
+                            "\n📚 What fine-tuning does:\n"
+                            "  • Creates a custom AI trained on your files\n"
+                            "  • Model learns YOUR specific data deeply\n"
+                            "  • Even better responses about your files\n"
+                            "  • Push-button easy!"
+                        )
+                        yield Static("\n💡 Status:", classes="section-title")
+                        yield Static(id="ai-status")
+
                     # Train tab
                     with TabPane("Train", id="tab-train"):
                         yield Static("Training", classes="section-title")
@@ -267,8 +299,9 @@ class IceNetApp(App):
                         yield Static(
                             "Keyboard Shortcuts:\n"
                             "  q - Quit application\n"
-                            "  e - Easy Train (NEW! No tech skills needed)\n"
-                            "  c - Chat with IceNet AI (NEW!)\n"
+                            "  e - Easy Train (No tech skills needed)\n"
+                            "  c - Chat with IceNet AI\n"
+                            "  a - AI Setup (NEW! Intelligent responses)\n"
                             "  t - Advanced Train tab\n"
                             "  m - Model tab\n"
                             "  s - Settings tab\n"
@@ -283,6 +316,11 @@ class IceNetApp(App):
                             "  1. Press 'c' to open Chat tab\n"
                             "  2. Type your message and click 'Send'\n"
                             "  3. Chat naturally with IceNet!\n\n"
+                            "🤖 AI Setup (Make Responses SMART!):\n"
+                            "  1. Press 'a' to open AI Setup tab\n"
+                            "  2. Click 'Setup Ollama' (automatic install)\n"
+                            "  3. Wait for completion - now chat uses AI!\n"
+                            "  4. Optional: Click 'Fine-Tune' for custom model\n\n"
                             "Advanced Training:\n"
                             "  1. Create a YAML config file\n"
                             "  2. Go to Train tab (press 't')\n"
@@ -445,6 +483,73 @@ class IceNetApp(App):
             # Clear input
             chat_input.value = ""
 
+        elif button_id == "setup-ollama-btn":
+            # Setup Ollama automatically
+            log_panel.add_log("🤖 Setting up Ollama...", "info")
+            ai_status = self.query_one("#ai-status", Static)
+
+            try:
+                ai_status.update("⏳ Installing Ollama (this may take a few minutes)...")
+
+                # Run setup in background (would need threading for real impl)
+                success = self.ollama_manager.setup()
+
+                if success:
+                    log_panel.add_log("✅ Ollama setup complete!", "success")
+                    log_panel.add_log("💬 Chat responses are now INTELLIGENT!", "success")
+                    ai_status.update("✅ Ollama is ready! Chat now uses AI.")
+
+                    # Reload chatbot to use Ollama
+                    from icenet.chat.retrieval import RetrievalChatbot
+                    data_dir = Path.home() / "icenet" / "training"
+                    self.chatbot.retrieval_bot = RetrievalChatbot(str(data_dir), use_ollama=True)
+                else:
+                    log_panel.add_log("⚠️ Setup incomplete - check logs above", "warning")
+                    ai_status.update("⚠️ Setup incomplete")
+            except Exception as e:
+                log_panel.add_log(f"❌ Error setting up Ollama: {e}", "error")
+                ai_status.update(f"❌ Error: {e}")
+
+        elif button_id == "finetune-btn":
+            # Fine-tune model on user's data
+            name_input = self.query_one("#finetune-name", Input)
+            model_name = name_input.value.strip()
+
+            if not model_name:
+                model_name = "icenet-custom"
+
+            log_panel.add_log(f"🎓 Fine-tuning model: {model_name}", "info")
+            ai_status = self.query_one("#ai-status", Static)
+
+            try:
+                # Check for training data
+                data_dir = Path.home() / "icenet" / "training"
+                data_file = data_dir / "training_data.txt"
+
+                if not data_file.exists():
+                    log_panel.add_log("❌ No training data! Train on files first.", "error")
+                    return
+
+                ai_status.update(f"⏳ Fine-tuning {model_name}...")
+
+                # Create fine-tuned model
+                success = self.ollama_manager.create_fine_tuned_model(
+                    base_model="llama3.2:latest",
+                    training_data=str(data_file),
+                    model_name=model_name
+                )
+
+                if success:
+                    log_panel.add_log(f"✅ Model '{model_name}' created!", "success")
+                    log_panel.add_log(f"💡 Use it with: icenet chat --model {model_name}", "info")
+                    ai_status.update(f"✅ Model '{model_name}' ready!")
+                else:
+                    log_panel.add_log("❌ Fine-tuning failed", "error")
+                    ai_status.update("❌ Fine-tuning failed")
+            except Exception as e:
+                log_panel.add_log(f"❌ Error: {e}", "error")
+                ai_status.update(f"❌ Error: {e}")
+
     def action_tab_train(self) -> None:
         """Switch to train tab"""
         tabs = self.query_one(TabbedContent)
@@ -474,6 +579,11 @@ class IceNetApp(App):
         """Switch to chat tab"""
         tabs = self.query_one(TabbedContent)
         tabs.active = "tab-chat"
+
+    def action_tab_ai(self) -> None:
+        """Switch to AI setup tab"""
+        tabs = self.query_one(TabbedContent)
+        tabs.active = "tab-ai"
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Handle Enter key in input fields"""
