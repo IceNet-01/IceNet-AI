@@ -71,62 +71,42 @@ echo ""
 # Check for Homebrew
 echo "Checking for Homebrew..."
 if ! command -v brew &> /dev/null; then
-    echo -e "${YELLOW}Homebrew not found${NC}"
-    echo "Homebrew is needed to install Ollama (AI model)"
-    read -p "Install Homebrew now? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "Installing Homebrew..."
-        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    echo "Installing Homebrew (required for AI features)..."
+    NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-        # Add Homebrew to PATH
-        if [[ "$ARCH" == "arm64" ]]; then
-            echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-            eval "$(/opt/homebrew/bin/brew shellenv)"
-        fi
-
-        echo -e "${GREEN}Homebrew installed${NC}"
+    # Add Homebrew to PATH
+    if [[ "$ARCH" == "arm64" ]]; then
+        echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+        eval "$(/opt/homebrew/bin/brew shellenv)"
     else
-        echo -e "${YELLOW}Skipping Homebrew installation${NC}"
-        echo "Note: You'll need to install Ollama manually later for AI features"
+        echo 'eval "$(/usr/local/bin/brew shellenv)"' >> ~/.bash_profile
+        eval "$(/usr/local/bin/brew shellenv)"
     fi
+
+    echo -e "${GREEN}✓ Homebrew installed${NC}"
 else
-    echo -e "${GREEN}Homebrew found${NC}"
+    echo -e "${GREEN}✓ Homebrew found${NC}"
 fi
 echo ""
 
 # Check for Ollama
 echo "Checking for Ollama (AI model runtime)..."
 if ! command -v ollama &> /dev/null; then
-    if command -v brew &> /dev/null; then
-        echo -e "${YELLOW}Ollama not found${NC}"
-        echo "Ollama provides intelligent AI responses (free, runs locally)"
-        read -p "Install Ollama now? (Recommended, y/n) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            echo "Installing Ollama via Homebrew..."
-            brew install ollama
-            echo -e "${GREEN}Ollama installed${NC}"
+    echo "Installing Ollama for intelligent AI responses..."
+    brew install ollama
+    echo -e "${GREEN}✓ Ollama installed${NC}"
 
-            # Start Ollama server in background
-            echo "Starting Ollama server..."
-            nohup ollama serve > /dev/null 2>&1 &
-            sleep 3
+    # Start Ollama server in background
+    echo "Starting Ollama server..."
+    nohup ollama serve > /dev/null 2>&1 &
+    sleep 3
 
-            # Download default model
-            echo "Downloading AI model (llama3.2 - this may take a few minutes)..."
-            ollama pull llama3.2:latest
-            echo -e "${GREEN}AI model ready!${NC}"
-        else
-            echo -e "${YELLOW}Skipping Ollama installation${NC}"
-            echo "You can install it later with: brew install ollama"
-        fi
-    else
-        echo -e "${YELLOW}Ollama not found (Homebrew required)${NC}"
-        echo "Install later with: icenet setup-ollama"
-    fi
+    # Download default model
+    echo "Downloading AI model (llama3.2 - this may take a few minutes)..."
+    ollama pull llama3.2:latest
+    echo -e "${GREEN}✓ AI model ready!${NC}"
 else
-    echo -e "${GREEN}Ollama found${NC}"
+    echo -e "${GREEN}✓ Ollama found${NC}"
 
     # Check if ollama is running
     if ! pgrep -x "ollama" > /dev/null; then
@@ -139,7 +119,9 @@ else
     if ! ollama list | grep -q "llama3.2"; then
         echo "Downloading AI model (llama3.2)..."
         ollama pull llama3.2:latest
-        echo -e "${GREEN}AI model ready!${NC}"
+        echo -e "${GREEN}✓ AI model ready!${NC}"
+    else
+        echo -e "${GREEN}✓ AI model ready!${NC}"
     fi
 fi
 echo ""
