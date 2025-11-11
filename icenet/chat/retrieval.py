@@ -4,6 +4,7 @@ Uses Ollama for intelligent responses with your data!
 """
 
 import json
+import re
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime
@@ -42,7 +43,6 @@ class RetrievalChatbot:
         self.conversation_id = None
         self.conversations_dir = Path.home() / "icenet" / "conversations"
         self.conversations_dir.mkdir(parents=True, exist_ok=True)
-        self.past_context = None  # Summary of past conversations for natural recall
 
         # Try to load data automatically
         self.load_data()
@@ -219,7 +219,6 @@ Then I'll be able to answer questions about your files!"""
 
         # Check if user is asking about a specific file by number
         file_number_query = None
-        import re
         number_match = re.search(r'\b(?:file\s+)?(\d+)\b', user_input.lower())
         if number_match:
             try:
@@ -228,7 +227,8 @@ Then I'll be able to answer questions about your files!"""
                 if 1 <= file_number <= len(file_list):
                     # User is asking about file #N - search for that specific filename
                     file_number_query = file_list[file_number - 1]
-            except:
+            except (ValueError, IndexError):
+                # Invalid file number - just ignore and use regular search
                 pass
 
         # Determine what type of response is needed
@@ -552,51 +552,13 @@ Or train me on more files with:
                         "messages": data.get('metadata', {}).get('total_messages', 0),
                         "filename": filepath.name,
                     })
-            except:
+            except (json.JSONDecodeError, KeyError, IOError):
+                # Skip corrupted or invalid conversation files
                 continue
 
         # Sort by timestamp (newest first)
         conversations.sort(key=lambda x: x['timestamp'], reverse=True)
         return conversations
-
-    def load_past_context(self):
-        """
-        Load context from past conversations to inform current behavior
-        This creates a natural memory without loading full conversation history
-        """
-        conversations = self.list_conversations()
-        if not conversations:
-            self.past_context = None
-            return
-
-        # Get recent conversations (last 5)
-        recent_convs = conversations[:5]
-
-        # Extract key topics and themes
-        topics = []
-        for conv in recent_convs:
-            try:
-                filepath = self.conversations_dir / conv['filename']
-                with open(filepath, 'r') as f:
-                    data = json.load(f)
-                    messages = data.get('messages', [])
-
-                    # Get user questions (good indicators of topics)
-                    user_messages = [m['content'] for m in messages if m['role'] == 'user'][:3]
-                    topics.extend(user_messages)
-            except:
-                continue
-
-        # Build context summary
-        if topics:
-            self.past_context = {
-                'num_past_conversations': len(conversations),
-                'recent_topics': topics[:10],  # Last 10 topics discussed
-                'has_relationship': True
-            }
-            logger.debug(f"Loaded context from {len(conversations)} past conversations")
-        else:
-            self.past_context = None
 
     def get_stats(self) -> Dict:
         """Get statistics about loaded data"""
