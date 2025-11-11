@@ -50,26 +50,46 @@ def check_for_updates() -> Tuple[bool, str]:
 
 def install_update() -> bool:
     """
-    Install latest update using pip
+    Install latest update from GitHub
 
     Returns:
         True if successful, False otherwise
     """
     try:
-        # Upgrade via pip
-        subprocess.check_call([
-            sys.executable,
-            "-m",
-            "pip",
-            "install",
-            "--upgrade",
-            "icenet-ai",
-        ])
+        import tempfile
+        import shutil
+
+        # Create temporary directory
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_path = Path(temp_dir) / "IceNet-AI"
+
+            logger.info("Cloning latest version from GitHub...")
+            # Clone repository
+            subprocess.check_call([
+                "git",
+                "clone",
+                f"https://github.com/{GITHUB_REPO}.git",
+                str(repo_path),
+            ])
+
+            logger.info("Installing update...")
+            # Install from cloned repository
+            subprocess.check_call([
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "--upgrade",
+                str(repo_path),
+            ])
 
         return True
 
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to install update: {e}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected error during update: {e}")
         return False
 
 
