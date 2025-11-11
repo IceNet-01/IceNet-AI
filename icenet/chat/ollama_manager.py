@@ -2,6 +2,7 @@
 Ollama integration for IceNet - Automatic setup and management
 """
 
+import json
 import subprocess
 import requests
 import time
@@ -35,7 +36,7 @@ class OllamaManager:
                 text=True
             )
             return result.returncode == 0
-        except:
+        except (subprocess.SubprocessError, FileNotFoundError):
             return False
 
     def is_running(self) -> bool:
@@ -43,7 +44,7 @@ class OllamaManager:
         try:
             response = requests.get(f"{self.base_url}/api/tags", timeout=2)
             return response.status_code == 200
-        except:
+        except (requests.RequestException, ConnectionError, TimeoutError):
             return False
 
     def install_ollama(self) -> bool:
@@ -125,7 +126,7 @@ class OllamaManager:
                 data = response.json()
                 return [model['name'] for model in data.get('models', [])]
             return []
-        except:
+        except (requests.RequestException, json.JSONDecodeError, KeyError):
             return []
 
     def has_model(self, model_name: str) -> bool:
@@ -295,8 +296,6 @@ Please provide a helpful, accurate response."""
         Yields:
             Text chunks as they arrive
         """
-        import json
-
         for line in response.iter_lines():
             if line:
                 try:

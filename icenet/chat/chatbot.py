@@ -2,6 +2,8 @@
 Simple chatbot interface for IceNet
 """
 
+import sys
+import json
 import torch
 from typing import Optional, List, Dict
 import logging
@@ -68,18 +70,8 @@ class SimpleChatbot:
             Chatbot response
         """
         # Use retrieval bot (works immediately with your data!)
+        # Note: retrieval_bot manages conversation history internally
         response = self.retrieval_bot.chat(user_input)
-
-        # Also add to our history
-        self.conversation_history.append({
-            "role": "user",
-            "content": user_input
-        })
-        self.conversation_history.append({
-            "role": "assistant",
-            "content": response
-        })
-
         return response
 
     def _generate_response(self, user_input: str) -> str:
@@ -129,21 +121,15 @@ This will teach me about your data so I can answer questions!"""
 
     def clear_history(self):
         """Clear conversation history"""
-        self.conversation_history = []
         self.retrieval_bot.clear_history()
 
     def get_history(self) -> List[Dict[str, str]]:
         """Get conversation history"""
-        return self.conversation_history
+        return self.retrieval_bot.conversation_history
 
     def save_conversation(self, output_path: str):
-        """Save conversation to file"""
-        import json
-
-        with open(output_path, 'w') as f:
-            json.dump(self.conversation_history, f, indent=2)
-
-        logger.info(f"Conversation saved to {output_path}")
+        """Save conversation to file - delegates to retrieval_bot"""
+        return self.retrieval_bot.save_conversation(output_path)
 
 
 def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/training"):
@@ -261,33 +247,15 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
             # Handle both streaming and non-streaming responses
             if hasattr(response_stream, '__iter__') and not isinstance(response_stream, str):
                 # Streaming response - display token by token
-                import sys
                 for token in response_stream:
                     print(token, end='', flush=True)
                     sys.stdout.flush()
                 print("\n")  # End with newline
-
-                # Also update SimpleChatbot history
-                full_response = chatbot.retrieval_bot.conversation_history[-1]['content']
-                chatbot.conversation_history.append({
-                    "role": "user",
-                    "content": user_input
-                })
-                chatbot.conversation_history.append({
-                    "role": "assistant",
-                    "content": full_response
-                })
+                # Note: retrieval_bot already tracked this in conversation history
             else:
                 # Non-streaming fallback
                 print(f"{response_stream}\n")
-                chatbot.conversation_history.append({
-                    "role": "user",
-                    "content": user_input
-                })
-                chatbot.conversation_history.append({
-                    "role": "assistant",
-                    "content": response_stream
-                })
+                # Note: retrieval_bot already tracked this in conversation history
 
         except KeyboardInterrupt:
             print("\n\nChatbot: Goodbye! 👋\n")
