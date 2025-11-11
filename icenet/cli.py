@@ -15,6 +15,7 @@ from icenet.ui.app import run_ui
 from icenet.utils.updater import check_for_updates, install_update
 from icenet.chat import run_chat_loop
 from icenet.data.local_loader import LocalFileLoader
+from icenet.chat.ollama_manager import OllamaManager
 
 
 # Setup logging
@@ -247,6 +248,89 @@ def cmd_chat(args):
     run_chat_loop(model_path=model_path, data_dir=data_dir)
 
 
+def cmd_setup_ollama(args):
+    """Setup Ollama for AI-powered chat"""
+    print("\n" + "=" * 60)
+    print("🤖 IceNet AI - Ollama Setup Wizard")
+    print("=" * 60)
+    print("\nThis will install and configure Ollama for intelligent AI responses.")
+    print("Ollama runs locally on your Mac - 100% free and private!")
+    print("\n" + "=" * 60 + "\n")
+
+    manager = OllamaManager()
+
+    # Run complete setup
+    success = manager.setup(model_name=args.model if hasattr(args, 'model') and args.model else None)
+
+    if success:
+        print("\n✨ Success! You can now chat with intelligent AI responses.")
+        print("\nTry it out:")
+        print("  icenet chat")
+        print("\nYour questions will now get smart, conversational answers!")
+    else:
+        print("\n⚠️  Setup incomplete. Please follow the instructions above.")
+
+
+def cmd_fine_tune(args):
+    """Fine-tune a model on your data - SUPER EASY!"""
+    print("\n" + "=" * 60)
+    print("🎓 IceNet AI - Fine-Tuning (Push Button Mode!)")
+    print("=" * 60 + "\n")
+
+    # Check if training data exists
+    data_dir = Path(args.data_dir if hasattr(args, 'data_dir') and args.data_dir else "~/icenet/training").expanduser()
+    data_file = data_dir / "training_data.txt"
+
+    if not data_file.exists():
+        print("❌ No training data found!")
+        print("\n💡 First, train on your files:")
+        print("  icenet train-local ~/Documents")
+        return
+
+    print(f"📊 Found training data: {data_dir}")
+    print(f"   Ready to create your personalized AI model!\n")
+
+    # Get model name
+    if hasattr(args, 'name') and args.name:
+        model_name = args.name
+    else:
+        model_name = input("Enter a name for your model (e.g., 'my-assistant'): ").strip()
+        if not model_name:
+            model_name = "icenet-custom"
+
+    print(f"\n🎯 Creating model: {model_name}")
+
+    manager = OllamaManager()
+
+    # Ensure Ollama is set up
+    if not manager.is_running():
+        print("\n⚠️  Ollama is not running. Setting up now...")
+        if not manager.setup():
+            print("❌ Setup failed. Please run: icenet setup-ollama")
+            return
+
+    # Create fine-tuned model
+    print("\n🔧 Fine-tuning model on your data...")
+    print("   This creates a custom AI trained on your files!")
+
+    base_model = args.base if hasattr(args, 'base') and args.base else "llama3.2:latest"
+
+    success = manager.create_fine_tuned_model(
+        base_model=base_model,
+        training_data=str(data_file),
+        model_name=model_name,
+        system_prompt=f"You are a helpful AI assistant trained on the user's personal data. Answer questions accurately based on the training data."
+    )
+
+    if success:
+        print(f"\n✅ SUCCESS! Your custom model '{model_name}' is ready!")
+        print(f"\n💬 To use it:")
+        print(f"  icenet chat --model {model_name}")
+        print("\nYour AI now knows YOUR data intimately!")
+    else:
+        print("\n❌ Fine-tuning failed. Check the errors above.")
+
+
 def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
@@ -360,6 +444,38 @@ def main():
         help="Path to trained model (optional)"
     )
     parser_chat.set_defaults(func=cmd_chat)
+
+    # Setup Ollama command
+    parser_setup_ollama = subparsers.add_parser(
+        "setup-ollama",
+        help="Setup Ollama for intelligent AI responses (automatic!)",
+        aliases=["setup", "install-ai"]
+    )
+    parser_setup_ollama.add_argument(
+        "--model", "-m",
+        help="Model to download (default: llama3.2:latest)"
+    )
+    parser_setup_ollama.set_defaults(func=cmd_setup_ollama)
+
+    # Fine-tune command
+    parser_fine_tune = subparsers.add_parser(
+        "fine-tune",
+        help="Fine-tune a model on your data (push-button easy!)",
+        aliases=["finetune", "train-model"]
+    )
+    parser_fine_tune.add_argument(
+        "--name", "-n",
+        help="Name for your custom model"
+    )
+    parser_fine_tune.add_argument(
+        "--base", "-b",
+        help="Base model to fine-tune from (default: llama3.2:latest)"
+    )
+    parser_fine_tune.add_argument(
+        "--data-dir",
+        help="Directory with training data (default: ~/icenet/training)"
+    )
+    parser_fine_tune.set_defaults(func=cmd_fine_tune)
 
     # Parse arguments
     args = parser.parse_args()

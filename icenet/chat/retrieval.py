@@ -1,6 +1,6 @@
 """
 Simple retrieval-based chatbot that works immediately
-No training needed - just searches your data!
+Uses Ollama for intelligent responses with your data!
 """
 
 import json
@@ -12,22 +12,46 @@ logger = logging.getLogger(__name__)
 
 
 class RetrievalChatbot:
-    """Simple chatbot that searches through your training data"""
+    """Smart chatbot that searches your data and uses AI for responses"""
 
-    def __init__(self, data_dir: str = "~/icenet/training"):
+    def __init__(self, data_dir: str = "~/icenet/training", use_ollama: bool = True):
         """
         Initialize retrieval chatbot
 
         Args:
             data_dir: Directory with training data
+            use_ollama: Whether to use Ollama for AI responses (default: True)
         """
         self.data_dir = Path(data_dir).expanduser()
         self.chunks: List[str] = []
         self.metadata: Dict = {}
         self.conversation_history: List[Dict] = []
+        self.use_ollama = use_ollama
+        self.ollama_manager = None
 
         # Try to load data automatically
         self.load_data()
+
+        # Setup Ollama if requested
+        if self.use_ollama:
+            self._setup_ollama()
+
+    def _setup_ollama(self):
+        """Setup Ollama integration"""
+        try:
+            from icenet.chat.ollama_manager import OllamaManager
+            self.ollama_manager = OllamaManager()
+
+            # Check if Ollama is ready
+            if not self.ollama_manager.is_running():
+                logger.info("Ollama not running, will use fallback mode")
+                self.use_ollama = False
+            elif not self.ollama_manager.has_model(self.ollama_manager.default_model):
+                logger.info("Ollama model not found, will use fallback mode")
+                self.use_ollama = False
+        except Exception as e:
+            logger.warning(f"Ollama setup failed: {e}, using fallback mode")
+            self.use_ollama = False
 
     def load_data(self) -> bool:
         """Load training data from directory"""
@@ -136,8 +160,28 @@ Then I'll be able to answer questions about your files!"""
         # Search for relevant information
         results = self.search(user_input, top_k=3)
 
-        if not results:
-            response = f"""I couldn't find anything about "{user_input}" in your files.
+        # Use Ollama for intelligent responses if available
+        if self.use_ollama and self.ollama_manager:
+            if not results:
+                # No relevant data, but can still have a conversation
+                response = self.ollama_manager.chat(
+                    prompt=user_input,
+                    system_prompt=f"You are IceNet AI. The user has trained you on {self.metadata.get('total_files', 0)} files. However, you couldn't find relevant information for this specific question. Respond helpfully and suggest they might want to train you on more files or ask about topics in their existing data."
+                )
+            else:
+                # Build context from search results
+                context = "\n\n---\n\n".join(results)
+
+                # Get AI response with context
+                response = self.ollama_manager.chat(
+                    prompt=user_input,
+                    context=context,
+                    system_prompt=f"You are IceNet AI, a helpful assistant. You have access to the user's files (total: {self.metadata.get('total_files', 'some')} files). Use the provided context to answer accurately. Be conversational and helpful. Summarize code clearly. If asked about greetings or general conversation, respond naturally."
+                )
+        else:
+            # Fallback: basic responses without AI
+            if not results:
+                response = f"""I couldn't find anything about "{user_input}" in your files.
 
 I have data from {self.metadata.get('total_files', 'some')} files.
 
@@ -147,17 +191,22 @@ Try asking about:
 - General questions about your data
 
 Or train me on more files with:
-  icenet train-local /path/to/more/files"""
-        else:
-            # Build response from search results
-            response = f"Based on your files, here's what I found:\n\n"
+  icenet train-local /path/to/more/files
 
-            for i, result in enumerate(results, 1):
-                # Truncate long results
-                display_text = result[:500] + "..." if len(result) > 500 else result
-                response += f"📄 Result {i}:\n{display_text}\n\n"
+💡 Tip: Install Ollama for much better AI responses!
+  Run: icenet setup-ollama"""
+            else:
+                # Build response from search results
+                response = f"Based on your files, here's what I found:\n\n"
 
-            response += f"\n💡 This is from {self.metadata.get('total_files', 'your')} files I was trained on."
+                for i, result in enumerate(results, 1):
+                    # Truncate long results
+                    display_text = result[:500] + "..." if len(result) > 500 else result
+                    response += f"📄 Result {i}:\n{display_text}\n\n"
+
+                response += f"\n💡 This is from {self.metadata.get('total_files', 'your')} files I was trained on."
+                response += f"\n\n💡 Tip: Install Ollama for intelligent AI responses instead of raw data dumps!"
+                response += f"\n  Run: icenet setup-ollama"
 
         self.conversation_history.append({
             "role": "assistant",
