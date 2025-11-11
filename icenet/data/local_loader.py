@@ -17,7 +17,8 @@ class LocalFileLoader:
         '.txt', '.md', '.py', '.js', '.java', '.cpp', '.c', '.h',
         '.html', '.css', '.json', '.yaml', '.yml', '.sh', '.bash',
         '.rs', '.go', '.rb', '.php', '.swift', '.kt', '.ts', '.jsx', '.tsx',
-        '.r', '.sql', '.xml', '.csv', '.log', '.conf', '.cfg'
+        '.r', '.sql', '.xml', '.csv', '.log', '.conf', '.cfg',
+        '.pdf', '.docx', '.doc', '.rtf'  # Document formats
     }
 
     def __init__(
@@ -80,6 +81,42 @@ class LocalFileLoader:
         logger.info(f"Found {len(files)} files to process")
         return files
 
+    def _extract_text_from_pdf(self, file_path: Path) -> Optional[str]:
+        """Extract text from PDF file"""
+        try:
+            import pypdf
+            text = []
+            with open(file_path, 'rb') as f:
+                reader = pypdf.PdfReader(f)
+                for page in reader.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text.append(page_text)
+            return "\n".join(text)
+        except ImportError:
+            logger.warning(f"pypdf not installed. Install with: pip install pypdf")
+            return None
+        except Exception as e:
+            logger.debug(f"Failed to extract text from PDF {file_path}: {e}")
+            return None
+
+    def _extract_text_from_docx(self, file_path: Path) -> Optional[str]:
+        """Extract text from DOCX file"""
+        try:
+            import docx
+            doc = docx.Document(file_path)
+            text = []
+            for paragraph in doc.paragraphs:
+                if paragraph.text.strip():
+                    text.append(paragraph.text)
+            return "\n".join(text)
+        except ImportError:
+            logger.warning(f"python-docx not installed. Install with: pip install python-docx")
+            return None
+        except Exception as e:
+            logger.debug(f"Failed to extract text from DOCX {file_path}: {e}")
+            return None
+
     def load_texts(self, files: Optional[List[Path]] = None) -> List[str]:
         """
         Load text content from files
@@ -99,13 +136,25 @@ class LocalFileLoader:
 
         for file_path in files:
             try:
-                with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
-                    if content.strip():  # Only add non-empty files
-                        # Add file path as header for context
-                        text = f"# File: {file_path.relative_to(self.root_path)}\n\n{content}"
-                        texts.append(text)
-                        successful += 1
+                content = None
+
+                # Handle different file types
+                if file_path.suffix.lower() == '.pdf':
+                    content = self._extract_text_from_pdf(file_path)
+                elif file_path.suffix.lower() in ['.docx', '.doc']:
+                    content = self._extract_text_from_docx(file_path)
+                else:
+                    # Text-based files
+                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+
+                if content and content.strip():  # Only add non-empty files
+                    # Add file path as header for context
+                    text = f"# File: {file_path.relative_to(self.root_path)}\n\n{content}"
+                    texts.append(text)
+                    successful += 1
+                elif content is None:
+                    failed += 1
             except Exception as e:
                 logger.debug(f"Failed to read {file_path}: {e}")
                 failed += 1
