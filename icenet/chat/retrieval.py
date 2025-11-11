@@ -359,7 +359,7 @@ Or train me on more files with:
         with open(filepath, 'w') as f:
             json.dump(conversation_data, f, indent=2)
 
-        logger.info(f"Conversation saved to {filepath}")
+        logger.debug(f"Conversation auto-saved to {filepath}")
         return filepath
 
     def load_conversation(self, conversation_id: str):
