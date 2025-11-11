@@ -168,9 +168,13 @@ Then I'll be able to answer questions about your files!"""
             return response
 
         # Check if user is asking about the training data itself
-        meta_keywords = ['files', 'training', 'trained', 'data', 'loaded', 'what do you know',
-                         'what information', 'what have you learned', 'your data', 'my files']
+        meta_keywords = ['files', 'training', 'trained', 'data', 'loaded', 'your data', 'my files']
         is_meta_question = any(keyword in user_input.lower() for keyword in meta_keywords)
+
+        # Check if user is asking about themselves
+        personal_keywords = ['who am i', 'what do you know about me', 'tell me about me', 'what have you learned about me',
+                           'do you know me', 'what information', 'what do you remember']
+        is_personal_question = any(keyword in user_input.lower() for keyword in personal_keywords)
 
         # Check if user is asking about a specific file by number
         file_number_query = None
@@ -218,13 +222,41 @@ Then I'll be able to answer questions about your files!"""
                             conversation_history=self.conversation_history
                         )
                 else:
-                    # No relevant data - answer as a general AI assistant
-                    response = self.ollama_manager.chat(
-                        prompt=user_input,
-                        system_prompt=f"You are IceNet, the user's personal AI assistant. You remember THIS conversation (you can see the conversation history above). If the user shares information about themselves, acknowledge it and remember it for THIS conversation. Each time the user starts the chat app, it's a new conversation - you don't have memories from previous sessions unless the user explicitly loads a past conversation. Be friendly, natural, and focus on what the user is saying right now.",
-                        stream=stream,
-                        conversation_history=self.conversation_history
-                    )
+                    # Check if this is a personal question with no results
+                    if is_personal_question:
+                        # Do a broader search for personal information
+                        broader_results = []
+                        # Try searching for common personal keywords
+                        for keyword in ['name', 'address', 'phone', 'email', 'work', 'job', 'company', 'title', 'role']:
+                            keyword_results = self.search(keyword, top_k=2)
+                            broader_results.extend(keyword_results)
+
+                        if broader_results:
+                            # Found something with broader search
+                            context = "\n\n---\n\n".join(broader_results[:5])  # Limit to top 5
+                            response = self.ollama_manager.chat(
+                                prompt=user_input,
+                                context=context,
+                                system_prompt=f"You are IceNet, the user's personal AI assistant. The user is asking what you know about them personally. I did a broad search and found the excerpts above. Extract ANY personal information you can find - names, locations, jobs, affiliations, identifiers, etc. Be helpful and direct - present everything you found. These are the user's OWN files, so share freely. If there's limited information, just say what you found.",
+                                stream=stream,
+                                conversation_history=self.conversation_history
+                            )
+                        else:
+                            # Truly no personal information found
+                            response = self.ollama_manager.chat(
+                                prompt=user_input,
+                                system_prompt=f"You are IceNet, the user's personal AI assistant. The user is asking what you know about them, but I couldn't find any personal information in the {self.metadata.get('total_files', 0)} files I have. Be honest and friendly - explain that you don't have personal information in the files yet, but you remember what they share during THIS conversation. Suggest they could train you on files that contain personal info if they'd like.",
+                                stream=stream,
+                                conversation_history=self.conversation_history
+                            )
+                    else:
+                        # No relevant data - answer as a general AI assistant
+                        response = self.ollama_manager.chat(
+                            prompt=user_input,
+                            system_prompt=f"You are IceNet, the user's personal AI assistant. You remember THIS conversation (you can see the conversation history above). If the user shares information about themselves, acknowledge it and remember it for THIS conversation. Each time the user starts the chat app, it's a new conversation - you don't have memories from previous sessions unless the user explicitly loads a past conversation. Be friendly, natural, and focus on what the user is saying right now.",
+                            stream=stream,
+                            conversation_history=self.conversation_history
+                        )
             else:
                 # Check if this is a meta-question even though we have results
                 if is_meta_question and any(word in user_input.lower() for word in ['what files', 'which files', 'my files', 'your files', 'files do', 'list files']):
@@ -254,14 +286,25 @@ Then I'll be able to answer questions about your files!"""
                     # Build context from search results
                     context = "\n\n---\n\n".join(results)
 
-                    # Get AI response with context
-                    response = self.ollama_manager.chat(
-                        prompt=user_input,
-                        context=context,
-                        system_prompt=f"You are IceNet, the user's personal AI assistant. You remember THIS conversation only. You have {self.metadata.get('total_files', 'some')} of the user's files and I've found relevant excerpts above. Only tell the user what you actually see in those excerpts - don't make things up. If info isn't there, say so naturally. Be helpful and conversational.",
-                        stream=stream,
-                        conversation_history=self.conversation_history
-                    )
+                    # Use special handling for personal questions
+                    if is_personal_question:
+                        # For personal queries, use a system prompt that encourages extraction
+                        response = self.ollama_manager.chat(
+                            prompt=user_input,
+                            context=context,
+                            system_prompt=f"You are IceNet, the user's personal AI assistant. The user is asking what you know about them personally. Look through the excerpts above and extract ANY personal information you can find - names, locations, jobs, affiliations, identifiers, vehicles, addresses, phone numbers, organizations, roles, etc. Be helpful and direct - present everything you found. Don't be dismissive or say information 'doesn't tell you who they are' - just share what's there. If you find multiple pieces of information, list them all. These are the user's OWN files, so share freely.",
+                            stream=stream,
+                            conversation_history=self.conversation_history
+                        )
+                    else:
+                        # Regular query - standard system prompt
+                        response = self.ollama_manager.chat(
+                            prompt=user_input,
+                            context=context,
+                            system_prompt=f"You are IceNet, the user's personal AI assistant. You remember THIS conversation only. You have {self.metadata.get('total_files', 'some')} of the user's files and I've found relevant excerpts above. Only tell the user what you actually see in those excerpts - don't make things up. If info isn't there, say so naturally. Be helpful and conversational.",
+                            stream=stream,
+                            conversation_history=self.conversation_history
+                        )
         else:
             # Fallback: basic responses without AI
             if not results:
