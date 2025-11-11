@@ -84,13 +84,14 @@ class RetrievalChatbot:
             logger.error(f"Failed to load training data: {e}")
             return False
 
-    def search(self, query: str, top_k: int = 3) -> List[str]:
+    def search(self, query: str, top_k: int = 3, min_score: int = 3) -> List[str]:
         """
         Search for relevant chunks
 
         Args:
             query: Search query
             top_k: Number of results to return
+            min_score: Minimum relevance score (default: 3)
 
         Returns:
             List of relevant text chunks
@@ -115,7 +116,8 @@ class RetrievalChatbot:
             if query_lower in chunk_lower:
                 matches += 10
 
-            if matches > 0:
+            # Only include if score meets minimum threshold
+            if matches >= min_score:
                 scored_chunks.append((matches, chunk))
 
         # Sort by score and return top_k
@@ -163,10 +165,10 @@ Then I'll be able to answer questions about your files!"""
         # Use Ollama for intelligent responses if available
         if self.use_ollama and self.ollama_manager:
             if not results:
-                # No relevant data, but can still have a conversation
+                # No relevant data - answer as a general AI assistant
                 response = self.ollama_manager.chat(
                     prompt=user_input,
-                    system_prompt=f"You are IceNet AI. The user has trained you on {self.metadata.get('total_files', 0)} files. However, you couldn't find relevant information for this specific question. Respond helpfully and suggest they might want to train you on more files or ask about topics in their existing data."
+                    system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 0)} files from their computer, but this question doesn't seem related to those files. Answer the question normally using your general knowledge. Only mention the training files if the user specifically asks about them or their data."
                 )
             else:
                 # Build context from search results
@@ -176,7 +178,7 @@ Then I'll be able to answer questions about your files!"""
                 response = self.ollama_manager.chat(
                     prompt=user_input,
                     context=context,
-                    system_prompt=f"You are IceNet AI, a helpful assistant. You have access to the user's files (total: {self.metadata.get('total_files', 'some')} files). Use the provided context to answer accurately. Be conversational and helpful. Summarize code clearly. If asked about greetings or general conversation, respond naturally."
+                    system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 'some')} files. I've provided some context from those files below. IMPORTANT: Only use this context if it's actually relevant to answering the question. If the question is general knowledge (like 'what year did we land on the moon?' or 'when does it snow?'), answer normally and ignore the file context. If the context IS relevant (like the user asks about their code, documents, or files), then use it to provide a helpful answer. Be conversational and natural."
                 )
         else:
             # Fallback: basic responses without AI
