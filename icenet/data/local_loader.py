@@ -18,7 +18,8 @@ class LocalFileLoader:
         '.html', '.css', '.json', '.yaml', '.yml', '.sh', '.bash',
         '.rs', '.go', '.rb', '.php', '.swift', '.kt', '.ts', '.jsx', '.tsx',
         '.r', '.sql', '.xml', '.csv', '.log', '.conf', '.cfg',
-        '.pdf', '.docx', '.doc', '.rtf'  # Document formats
+        '.pdf', '.docx', '.doc', '.rtf',  # Document formats
+        '.xlsx', '.xls'  # Spreadsheet formats
     }
 
     def __init__(
@@ -117,6 +118,32 @@ class LocalFileLoader:
             logger.debug(f"Failed to extract text from DOCX {file_path}: {e}")
             return None
 
+    def _extract_text_from_excel(self, file_path: Path) -> Optional[str]:
+        """Extract text from Excel file"""
+        try:
+            import openpyxl
+            workbook = openpyxl.load_workbook(file_path, data_only=True)
+            text = []
+
+            for sheet_name in workbook.sheetnames:
+                sheet = workbook[sheet_name]
+                text.append(f"\n=== Sheet: {sheet_name} ===\n")
+
+                # Get all rows with data
+                for row in sheet.iter_rows(values_only=True):
+                    # Filter out empty rows
+                    row_values = [str(cell) if cell is not None else '' for cell in row]
+                    if any(val.strip() for val in row_values):
+                        text.append(' | '.join(row_values))
+
+            return "\n".join(text)
+        except ImportError:
+            logger.warning(f"openpyxl not installed. Install with: pip install openpyxl")
+            return None
+        except Exception as e:
+            logger.debug(f"Failed to extract text from Excel {file_path}: {e}")
+            return None
+
     def load_texts(self, files: Optional[List[Path]] = None) -> List[str]:
         """
         Load text content from files
@@ -143,6 +170,8 @@ class LocalFileLoader:
                     content = self._extract_text_from_pdf(file_path)
                 elif file_path.suffix.lower() in ['.docx', '.doc']:
                     content = self._extract_text_from_docx(file_path)
+                elif file_path.suffix.lower() in ['.xlsx', '.xls']:
+                    content = self._extract_text_from_excel(file_path)
                 else:
                     # Text-based files
                     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
