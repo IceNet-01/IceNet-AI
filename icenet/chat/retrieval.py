@@ -171,8 +171,23 @@ Then I'll be able to answer questions about your files!"""
                          'what information', 'what have you learned', 'your data', 'my files']
         is_meta_question = any(keyword in user_input.lower() for keyword in meta_keywords)
 
-        # Search for relevant information
-        results = self.search(user_input, top_k=3)
+        # Check if user is asking about a specific file by number
+        file_number_query = None
+        import re
+        number_match = re.search(r'\b(?:file\s+)?(\d+)\b', user_input.lower())
+        if number_match:
+            try:
+                file_number = int(number_match.group(1))
+                file_list = self.metadata.get('files', [])
+                if 1 <= file_number <= len(file_list):
+                    # User is asking about file #N - search for that specific filename
+                    file_number_query = file_list[file_number - 1]
+            except:
+                pass
+
+        # Search for relevant information (use filename if asking about specific file)
+        search_query = file_number_query if file_number_query else user_input
+        results = self.search(search_query, top_k=3)
 
         # Use Ollama for intelligent responses if available
         if self.use_ollama and self.ollama_manager:
@@ -184,11 +199,11 @@ Then I'll be able to answer questions about your files!"""
 
                     if file_list:
                         # Have file list - show it
-                        file_info = "\n".join([f"- {f}" for f in file_list[:20]])
+                        file_info = "\n".join([f"{idx+1}. {f}" for idx, f in enumerate(file_list[:20])])
                         response = self.ollama_manager.chat(
                             prompt=user_input,
-                            context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles:\n{file_info}",
-                            system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided a list of the {self.metadata.get('total_files', 0)} files you were trained on. List these actual file names clearly. You HAVE full access to the contents of these files - they are in your training data chunks. Be specific and helpful.",
+                            context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles (numbered list):\n{file_info}",
+                            system_prompt=f"You are IceNet AI, the user's personal AI assistant. You have been trained on {self.metadata.get('total_files', 0)} files from the user's computer. IMPORTANT: These are the USER'S OWN FILES - you can freely discuss their contents. You have FULL ACCESS to search and read all content from these files in your {len(self.chunks)} training chunks. List the file names clearly with their numbers. Be helpful and informative about what's in these files.",
                             stream=stream,
                             conversation_history=self.conversation_history
                         )
@@ -217,11 +232,11 @@ Then I'll be able to answer questions about your files!"""
 
                     if file_list:
                         # Have file list - show it
-                        file_info = "\n".join([f"- {f}" for f in file_list[:20]])
+                        file_info = "\n".join([f"{idx+1}. {f}" for idx, f in enumerate(file_list[:20])])
                         response = self.ollama_manager.chat(
                             prompt=user_input,
-                            context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles:\n{file_info}",
-                            system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided a list of the {self.metadata.get('total_files', 0)} actual file names. List these file names clearly. You HAVE full access to the contents of these files. Be specific and helpful.",
+                            context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles (numbered list):\n{file_info}",
+                            system_prompt=f"You are IceNet AI, the user's personal AI assistant. These are the USER'S OWN FILES from their computer - you can freely discuss their contents without any privacy concerns. You have FULL ACCESS to search and read all {len(self.chunks)} chunks of content from these {self.metadata.get('total_files', 0)} files. When the user asks about a specific file (by name or number), search your training data and provide helpful information about what's in it. Be specific and helpful.",
                             stream=stream,
                             conversation_history=self.conversation_history
                         )
@@ -242,7 +257,7 @@ Then I'll be able to answer questions about your files!"""
                     response = self.ollama_manager.chat(
                         prompt=user_input,
                         context=context,
-                        system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 'some')} files. I've provided some context from those files below. IMPORTANT: Only use this context if it's actually relevant to answering the question. If the question is general knowledge (like 'what year did we land on the moon?' or 'when does it snow?'), answer normally and ignore the file context. If the context IS relevant (like the user asks about their code, documents, or files), then use it to provide a helpful answer. Be conversational and natural.",
+                        system_prompt=f"You are IceNet AI, the user's personal AI assistant. You have been trained on {self.metadata.get('total_files', 'some')} files from the user's computer. I've provided relevant excerpts from those files below. IMPORTANT: These are the USER'S OWN PRIVATE FILES - you can freely discuss their contents. Only use the file context if it's relevant to the question. For general knowledge questions (like 'what year did we land on the moon?'), answer normally and ignore the file context. When discussing file contents, be helpful, specific, and informative. No privacy restrictions apply to the user's own files.",
                         stream=stream,
                         conversation_history=self.conversation_history
                     )
