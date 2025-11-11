@@ -175,14 +175,24 @@ Then I'll be able to answer questions about your files!"""
                 if is_meta_question:
                     # Provide info about training data
                     file_list = self.metadata.get('files', [])
-                    file_info = "\n".join([f"- {f}" for f in file_list[:20]])  # Show up to 20 files
 
-                    response = self.ollama_manager.chat(
-                        prompt=user_input,
-                        context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles:\n{file_info}",
-                        system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided information about the {self.metadata.get('total_files', 0)} files you were trained on. Use this information to answer their question about what files/data you have access to. Be specific and helpful.",
-                        stream=stream
-                    )
+                    if file_list:
+                        # Have file list - show it
+                        file_info = "\n".join([f"- {f}" for f in file_list[:20]])
+                        response = self.ollama_manager.chat(
+                            prompt=user_input,
+                            context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles:\n{file_info}",
+                            system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided a list of the {self.metadata.get('total_files', 0)} files you were trained on. List these actual file names clearly. You HAVE full access to the contents of these files - they are in your training data chunks. Be specific and helpful.",
+                            stream=stream
+                        )
+                    else:
+                        # No file list in metadata - explain the situation
+                        response = self.ollama_manager.chat(
+                            prompt=user_input,
+                            context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nNote: File names are not available in the metadata (old training format). The user needs to re-train to see file names.",
+                            system_prompt=f"You are IceNet AI. The user is asking about their files. You have {self.metadata.get('total_files', 0)} files worth of content in {len(self.chunks)} chunks, and you CAN search and read that content. However, the file NAMES weren't saved in the metadata. Explain that you have the file CONTENTS and can answer questions about them, but to see the actual file names, they need to re-train with: icenet train-local /path/to/files --yes",
+                            stream=stream
+                        )
                 else:
                     # No relevant data - answer as a general AI assistant
                     response = self.ollama_manager.chat(
@@ -195,14 +205,24 @@ Then I'll be able to answer questions about your files!"""
                 if is_meta_question and any(word in user_input.lower() for word in ['what files', 'which files', 'my files', 'your files', 'files do', 'list files']):
                     # User wants to know about the files themselves, not search them
                     file_list = self.metadata.get('files', [])
-                    file_info = "\n".join([f"- {f}" for f in file_list[:20]])
 
-                    response = self.ollama_manager.chat(
-                        prompt=user_input,
-                        context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles:\n{file_info}",
-                        system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided a list of the {self.metadata.get('total_files', 0)} files you were trained on. Answer their question by telling them about these files. Be specific and helpful.",
-                        stream=stream
-                    )
+                    if file_list:
+                        # Have file list - show it
+                        file_info = "\n".join([f"- {f}" for f in file_list[:20]])
+                        response = self.ollama_manager.chat(
+                            prompt=user_input,
+                            context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles:\n{file_info}",
+                            system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided a list of the {self.metadata.get('total_files', 0)} actual file names. List these file names clearly. You HAVE full access to the contents of these files. Be specific and helpful.",
+                            stream=stream
+                        )
+                    else:
+                        # No file list - explain and continue with search results
+                        response = self.ollama_manager.chat(
+                            prompt=user_input,
+                            context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nNote: File names not available (old training format).",
+                            system_prompt=f"You are IceNet AI. The user asked about their files. You have {self.metadata.get('total_files', 0)} files worth of content ({len(self.chunks)} chunks total) and CAN search and read that content. However, the file NAMES weren't saved in the metadata. Explain that you have the CONTENTS and can answer questions about them, but to see file names, they need to re-train: icenet train-local /path/to/files --yes",
+                            stream=stream
+                        )
                 else:
                     # Build context from search results
                     context = "\n\n---\n\n".join(results)
