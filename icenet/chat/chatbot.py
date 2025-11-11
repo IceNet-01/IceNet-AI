@@ -154,6 +154,12 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
         model_path: Optional path to trained model
         data_dir: Directory with training data
     """
+    # ANSI color codes for terminal
+    USER_COLOR = "\033[96m"      # Cyan for user
+    BOT_COLOR = "\033[92m"       # Green for bot
+    RESET_COLOR = "\033[0m"      # Reset to default
+    BOLD = "\033[1m"             # Bold text
+
     print("\n" + "=" * 60)
     print("IceNet AI Chatbot - Chat About Your Files!")
     print("=" * 60)
@@ -166,6 +172,11 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
     if stats['has_data']:
         print(f"✓ Ready to chat! I have data from {stats['metadata'].get('total_files', '?')} files")
         print(f"  ({stats['chunks_loaded']} chunks loaded)")
+
+        # Check if file list is available in metadata
+        if not stats['metadata'].get('files'):
+            print(f"\n💡 Tip: Re-train to enable file list viewing:")
+            print(f"  icenet train-local /path/to/your/files --yes")
     else:
         print("⚠ No training data found!")
         print("  Train me first with: icenet train-local /path/to/files")
@@ -178,15 +189,15 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
 
     while True:
         try:
-            # Get user input
-            user_input = input("You: ").strip()
+            # Get user input with color
+            user_input = input(f"{BOLD}{USER_COLOR}You:{RESET_COLOR} ").strip()
 
             if not user_input:
                 continue
 
             # Handle special commands
             if user_input.lower() in ['exit', 'quit', 'bye']:
-                print("\nChatbot: Goodbye! 👋\n")
+                print(f"\n{BOLD}{BOT_COLOR}Chatbot:{RESET_COLOR} Goodbye! 👋\n")
                 break
 
             elif user_input.lower() == 'clear':
@@ -201,7 +212,7 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
                 continue
 
             # Get response with streaming
-            print(f"\nChatbot: ", end='', flush=True)
+            print(f"\n{BOLD}{BOT_COLOR}Chatbot:{RESET_COLOR} ", end='', flush=True)
 
             # Stream response in real-time
             response_stream = chatbot.retrieval_bot.chat(user_input, stream=True)
