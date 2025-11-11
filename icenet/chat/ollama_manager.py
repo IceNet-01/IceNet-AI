@@ -214,6 +214,7 @@ class OllamaManager:
         context: Optional[str] = None,
         system_prompt: Optional[str] = None,
         stream: bool = False,
+        conversation_history: Optional[List[Dict]] = None,
     ) -> str:
         """
         Send a chat request to Ollama
@@ -224,23 +225,38 @@ class OllamaManager:
             context: Additional context to include
             system_prompt: System prompt for the model
             stream: If True, yields tokens as they arrive (generator)
+            conversation_history: Previous conversation messages for context
 
         Returns:
             Model's response (or generator if stream=True)
         """
         model_name = model or self.default_model
 
-        # Build the full prompt
+        # Build the full prompt with conversation history
+        full_prompt = ""
+
+        # Add conversation history for context (last 5 exchanges to avoid token limits)
+        if conversation_history and len(conversation_history) > 0:
+            recent_history = conversation_history[-10:]  # Last 10 messages (5 exchanges)
+            history_text = "\n".join([
+                f"{'User' if msg['role'] == 'user' else 'Assistant'}: {msg['content']}"
+                for msg in recent_history[:-1]  # Exclude current message
+            ])
+            if history_text:
+                full_prompt += f"Previous conversation:\n{history_text}\n\n"
+
+        # Add context from file search
         if context:
-            full_prompt = f"""Based on the following information:
+            full_prompt += f"""Based on the following information:
 
 {context}
 
-Question: {prompt}
+"""
+
+        # Add current question
+        full_prompt += f"""Question: {prompt}
 
 Please provide a helpful, accurate response."""
-        else:
-            full_prompt = prompt
 
         try:
             # Use Ollama API

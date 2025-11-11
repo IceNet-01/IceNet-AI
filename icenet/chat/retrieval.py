@@ -6,6 +6,7 @@ Uses Ollama for intelligent responses with your data!
 import json
 from pathlib import Path
 from typing import List, Dict, Optional
+from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
@@ -14,13 +15,14 @@ logger = logging.getLogger(__name__)
 class RetrievalChatbot:
     """Smart chatbot that searches your data and uses AI for responses"""
 
-    def __init__(self, data_dir: str = "~/icenet/training", use_ollama: bool = True):
+    def __init__(self, data_dir: str = "~/icenet/training", use_ollama: bool = True, auto_save: bool = True):
         """
         Initialize retrieval chatbot
 
         Args:
             data_dir: Directory with training data
             use_ollama: Whether to use Ollama for AI responses (default: True)
+            auto_save: Whether to automatically save conversations (default: True)
         """
         self.data_dir = Path(data_dir).expanduser()
         self.chunks: List[str] = []
@@ -28,6 +30,10 @@ class RetrievalChatbot:
         self.conversation_history: List[Dict] = []
         self.use_ollama = use_ollama
         self.ollama_manager = None
+        self.auto_save = auto_save
+        self.conversation_id = None
+        self.conversations_dir = Path.home() / "icenet" / "conversations"
+        self.conversations_dir.mkdir(parents=True, exist_ok=True)
 
         # Try to load data automatically
         self.load_data()
@@ -183,7 +189,8 @@ Then I'll be able to answer questions about your files!"""
                             prompt=user_input,
                             context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles:\n{file_info}",
                             system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided a list of the {self.metadata.get('total_files', 0)} files you were trained on. List these actual file names clearly. You HAVE full access to the contents of these files - they are in your training data chunks. Be specific and helpful.",
-                            stream=stream
+                            stream=stream,
+                            conversation_history=self.conversation_history
                         )
                     else:
                         # No file list in metadata - explain the situation
@@ -191,14 +198,16 @@ Then I'll be able to answer questions about your files!"""
                             prompt=user_input,
                             context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nNote: File names are not available in the metadata (old training format). The user needs to re-train to see file names.",
                             system_prompt=f"You are IceNet AI. The user is asking about their files. You have {self.metadata.get('total_files', 0)} files worth of content in {len(self.chunks)} chunks, and you CAN search and read that content. However, the file NAMES weren't saved in the metadata. Explain that you have the file CONTENTS and can answer questions about them, but to see the actual file names, they need to re-train with: icenet train-local /path/to/files --yes",
-                            stream=stream
+                            stream=stream,
+                            conversation_history=self.conversation_history
                         )
                 else:
                     # No relevant data - answer as a general AI assistant
                     response = self.ollama_manager.chat(
                         prompt=user_input,
                         system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 0)} files from their computer, but this question doesn't seem related to those files. Answer the question normally using your general knowledge. Only mention the training files if the user specifically asks about them or their data.",
-                        stream=stream
+                        stream=stream,
+                        conversation_history=self.conversation_history
                     )
             else:
                 # Check if this is a meta-question even though we have results
@@ -213,7 +222,8 @@ Then I'll be able to answer questions about your files!"""
                             prompt=user_input,
                             context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles:\n{file_info}",
                             system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided a list of the {self.metadata.get('total_files', 0)} actual file names. List these file names clearly. You HAVE full access to the contents of these files. Be specific and helpful.",
-                            stream=stream
+                            stream=stream,
+                            conversation_history=self.conversation_history
                         )
                     else:
                         # No file list - explain and continue with search results
@@ -221,7 +231,8 @@ Then I'll be able to answer questions about your files!"""
                             prompt=user_input,
                             context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nNote: File names not available (old training format).",
                             system_prompt=f"You are IceNet AI. The user asked about their files. You have {self.metadata.get('total_files', 0)} files worth of content ({len(self.chunks)} chunks total) and CAN search and read that content. However, the file NAMES weren't saved in the metadata. Explain that you have the CONTENTS and can answer questions about them, but to see file names, they need to re-train: icenet train-local /path/to/files --yes",
-                            stream=stream
+                            stream=stream,
+                            conversation_history=self.conversation_history
                         )
                 else:
                     # Build context from search results
@@ -232,7 +243,8 @@ Then I'll be able to answer questions about your files!"""
                         prompt=user_input,
                         context=context,
                         system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 'some')} files. I've provided some context from those files below. IMPORTANT: Only use this context if it's actually relevant to answering the question. If the question is general knowledge (like 'what year did we land on the moon?' or 'when does it snow?'), answer normally and ignore the file context. If the context IS relevant (like the user asks about their code, documents, or files), then use it to provide a helpful answer. Be conversational and natural.",
-                        stream=stream
+                        stream=stream,
+                        conversation_history=self.conversation_history
                     )
         else:
             # Fallback: basic responses without AI
@@ -274,6 +286,11 @@ Or train me on more files with:
                 "role": "assistant",
                 "content": response
             })
+
+            # Auto-save if enabled
+            if self.auto_save:
+                self.save_conversation()
+
             return response
 
     def _stream_and_collect(self, response_generator):
@@ -298,9 +315,108 @@ Or train me on more files with:
             "content": full_response
         })
 
+        # Auto-save if enabled
+        if self.auto_save:
+            self.save_conversation()
+
     def clear_history(self):
         """Clear conversation history"""
         self.conversation_history = []
+        self.conversation_id = None
+
+    def save_conversation(self, filename: Optional[str] = None):
+        """
+        Save conversation to file
+
+        Args:
+            filename: Optional custom filename. If not provided, uses conversation_id
+        """
+        if not self.conversation_history:
+            logger.warning("No conversation history to save")
+            return None
+
+        # Generate conversation ID if not exists
+        if not self.conversation_id:
+            self.conversation_id = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+        # Use custom filename or default
+        if filename:
+            filepath = self.conversations_dir / filename
+        else:
+            filepath = self.conversations_dir / f"conversation_{self.conversation_id}.json"
+
+        # Save conversation with metadata
+        conversation_data = {
+            "id": self.conversation_id,
+            "timestamp": datetime.now().isoformat(),
+            "messages": self.conversation_history,
+            "metadata": {
+                "total_messages": len(self.conversation_history),
+                "data_dir": str(self.data_dir),
+            }
+        }
+
+        with open(filepath, 'w') as f:
+            json.dump(conversation_data, f, indent=2)
+
+        logger.info(f"Conversation saved to {filepath}")
+        return filepath
+
+    def load_conversation(self, conversation_id: str):
+        """
+        Load a previous conversation
+
+        Args:
+            conversation_id: ID of conversation to load (or filename)
+        """
+        # Try as filename first
+        filepath = self.conversations_dir / conversation_id
+        if not filepath.exists():
+            # Try adding .json extension
+            filepath = self.conversations_dir / f"conversation_{conversation_id}.json"
+
+        if not filepath.exists():
+            logger.error(f"Conversation not found: {conversation_id}")
+            return False
+
+        try:
+            with open(filepath, 'r') as f:
+                conversation_data = json.load(f)
+
+            self.conversation_history = conversation_data.get('messages', [])
+            self.conversation_id = conversation_data.get('id')
+
+            logger.info(f"Loaded conversation {self.conversation_id} with {len(self.conversation_history)} messages")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to load conversation: {e}")
+            return False
+
+    def list_conversations(self) -> List[Dict]:
+        """
+        List all saved conversations
+
+        Returns:
+            List of conversation metadata
+        """
+        conversations = []
+        for filepath in self.conversations_dir.glob("conversation_*.json"):
+            try:
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
+                    conversations.append({
+                        "id": data.get('id'),
+                        "timestamp": data.get('timestamp'),
+                        "messages": data.get('metadata', {}).get('total_messages', 0),
+                        "filename": filepath.name,
+                    })
+            except:
+                continue
+
+        # Sort by timestamp (newest first)
+        conversations.sort(key=lambda x: x['timestamp'], reverse=True)
+        return conversations
 
     def get_stats(self) -> Dict:
         """Get statistics about loaded data"""

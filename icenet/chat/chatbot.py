@@ -182,9 +182,13 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
         print("  Train me first with: icenet train-local /path/to/files")
         print("  For example: icenet train-local ~/Documents")
 
-    print("\nType 'exit' or 'quit' to end the conversation")
-    print("Type 'clear' to clear conversation history")
-    print("Type 'save' to save the conversation")
+    print("\nCommands:")
+    print("  'exit' or 'quit' - End the conversation")
+    print("  'clear' - Clear conversation history")
+    print("  'save' - Manually save conversation")
+    print("  'list' - List saved conversations")
+    print("  'load <id>' - Load a previous conversation")
+    print("\n💡 Conversations are automatically saved after each message")
     print("=" * 60 + "\n")
 
     while True:
@@ -201,14 +205,39 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
                 break
 
             elif user_input.lower() == 'clear':
+                chatbot.retrieval_bot.clear_history()
                 chatbot.clear_history()
                 print("\n[Conversation history cleared]\n")
                 continue
 
             elif user_input.lower() == 'save':
-                filename = f"conversation_{Path.cwd()}/conversation.json"
-                chatbot.save_conversation(filename)
-                print(f"\n[Conversation saved to {filename}]\n")
+                filepath = chatbot.retrieval_bot.save_conversation()
+                print(f"\n[Conversation saved to {filepath}]\n")
+                continue
+
+            elif user_input.lower() == 'list':
+                conversations = chatbot.retrieval_bot.list_conversations()
+                if not conversations:
+                    print("\n[No saved conversations found]\n")
+                else:
+                    print("\n📚 Saved Conversations:")
+                    print("-" * 60)
+                    for conv in conversations[:10]:  # Show last 10
+                        timestamp = conv['timestamp'][:19].replace('T', ' ')
+                        print(f"  ID: {conv['id']}")
+                        print(f"  Time: {timestamp}")
+                        print(f"  Messages: {conv['messages']}")
+                        print("-" * 60)
+                    print(f"\nTo load: type 'load <id>'\n")
+                continue
+
+            elif user_input.lower().startswith('load '):
+                conversation_id = user_input[5:].strip()
+                if chatbot.retrieval_bot.load_conversation(conversation_id):
+                    print(f"\n[Loaded conversation: {conversation_id}]")
+                    print(f"[{len(chatbot.retrieval_bot.conversation_history)} messages restored]\n")
+                else:
+                    print(f"\n[Failed to load conversation: {conversation_id}]\n")
                 continue
 
             # Get response with streaming
