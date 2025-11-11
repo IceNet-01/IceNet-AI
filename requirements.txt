@@ -42,6 +42,7 @@ requests>=2.31.0
 aiohttp>=3.9.0
 psutil>=5.9.0
 GPUtil>=1.4.0
+duckduckgo-search>=4.0.0
 
 # Development
 pytest>=7.4.0

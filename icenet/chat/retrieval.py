@@ -11,6 +11,14 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Try to import web search capability
+try:
+    from duckduckgo_search import DDGS
+    WEB_SEARCH_AVAILABLE = True
+except ImportError:
+    WEB_SEARCH_AVAILABLE = False
+    logger.debug("duckduckgo-search not available - web search disabled")
+
 
 class RetrievalChatbot:
     """Smart chatbot that searches your data and uses AI for responses"""
@@ -131,6 +139,29 @@ class RetrievalChatbot:
         scored_chunks.sort(reverse=True, key=lambda x: x[0])
         return [chunk for _, chunk in scored_chunks[:top_k]]
 
+    def web_search(self, query: str, max_results: int = 3) -> List[Dict[str, str]]:
+        """
+        Search the web for current information
+
+        Args:
+            query: Search query
+            max_results: Maximum number of results to return
+
+        Returns:
+            List of search results with title, body, and href
+        """
+        if not WEB_SEARCH_AVAILABLE:
+            logger.warning("Web search not available - install duckduckgo-search")
+            return []
+
+        try:
+            with DDGS() as ddgs:
+                results = list(ddgs.text(query, max_results=max_results))
+                return results
+        except Exception as e:
+            logger.error(f"Web search failed: {e}")
+            return []
+
     def chat(self, user_input: str, stream: bool = False):
         """
         Generate response to user input
@@ -176,6 +207,16 @@ Then I'll be able to answer questions about your files!"""
                            'do you know me', 'what information', 'what do you remember']
         is_personal_question = any(keyword in user_input.lower() for keyword in personal_keywords)
 
+        # Check if user wants non-file information (general knowledge)
+        non_file_keywords = ['anything you know', 'what you know', 'not from my files', 'not from files',
+                            'from your knowledge', 'do you know', 'general knowledge', 'just know']
+        wants_non_file = any(keyword in user_input.lower() for keyword in non_file_keywords)
+
+        # Check if question needs web search (current stats, recent events, etc.)
+        web_search_keywords = ['stats', 'statistics', 'current', 'latest', 'recent', 'today',
+                              'this year', 'now', 'how many', 'what percentage', 'data on']
+        needs_web_search = any(keyword in user_input.lower() for keyword in web_search_keywords)
+
         # Check if user is asking about a specific file by number
         file_number_query = None
         import re
@@ -190,13 +231,23 @@ Then I'll be able to answer questions about your files!"""
             except:
                 pass
 
-        # Search for relevant information (use filename if asking about specific file)
-        search_query = file_number_query if file_number_query else user_input
-        results = self.search(search_query, top_k=3)
+        # Determine what type of response is needed
+        # If user explicitly wants non-file info, skip file search
+        if wants_non_file:
+            results = []
+        else:
+            # Search for relevant information (use filename if asking about specific file)
+            search_query = file_number_query if file_number_query else user_input
+            results = self.search(search_query, top_k=3)
+
+        # Check if we should use web search
+        web_results = []
+        if needs_web_search and WEB_SEARCH_AVAILABLE:
+            web_results = self.web_search(user_input, max_results=3)
 
         # Use Ollama for intelligent responses if available
         if self.use_ollama and self.ollama_manager:
-            if not results:
+            if not results and not web_results:
                 # Check if asking about training data
                 if is_meta_question:
                     # Provide info about training data
@@ -250,10 +301,10 @@ Then I'll be able to answer questions about your files!"""
                                 conversation_history=self.conversation_history
                             )
                     else:
-                        # No relevant data - answer as a general AI assistant
+                        # No relevant data - answer as a general AI assistant using general knowledge
                         response = self.ollama_manager.chat(
                             prompt=user_input,
-                            system_prompt=f"You are IceNet, the user's personal AI assistant. You remember THIS conversation (you can see the conversation history above). If the user shares information about themselves, acknowledge it and remember it for THIS conversation. Each time the user starts the chat app, it's a new conversation - you don't have memories from previous sessions unless the user explicitly loads a past conversation. Be friendly, natural, and focus on what the user is saying right now.",
+                            system_prompt=f"You are IceNet, the user's personal AI assistant. You remember THIS conversation (you can see the conversation history above). I didn't find relevant information in the user's files, so use your general knowledge to answer their question. Be helpful, accurate, and conversational. If the user shares information about themselves, acknowledge it and remember it for THIS conversation. Each time the user starts the chat app, it's a new conversation. Be friendly, natural, and helpful.",
                             stream=stream,
                             conversation_history=self.conversation_history
                         )
@@ -283,8 +334,21 @@ Then I'll be able to answer questions about your files!"""
                             conversation_history=self.conversation_history
                         )
                 else:
-                    # Build context from search results
-                    context = "\n\n---\n\n".join(results)
+                    # Build context from file search results and/or web results
+                    context_parts = []
+
+                    if results:
+                        file_context = "\n\n---\n\n".join(results)
+                        context_parts.append(f"From your files:\n{file_context}")
+
+                    if web_results:
+                        web_context = "\n\n".join([
+                            f"[{r.get('title', 'No title')}]\n{r.get('body', 'No content')}\nSource: {r.get('href', 'Unknown')}"
+                            for r in web_results
+                        ])
+                        context_parts.append(f"From web search:\n{web_context}")
+
+                    context = "\n\n===\n\n".join(context_parts)
 
                     # Use special handling for personal questions
                     if is_personal_question:
@@ -296,8 +360,26 @@ Then I'll be able to answer questions about your files!"""
                             stream=stream,
                             conversation_history=self.conversation_history
                         )
+                    elif web_results and not results:
+                        # Only web results - use them for answer
+                        response = self.ollama_manager.chat(
+                            prompt=user_input,
+                            context=context,
+                            system_prompt=f"You are IceNet, the user's personal AI assistant. I did a web search to answer the user's question. The search results are above. Use this information to provide a helpful, natural answer. Summarize the key points and cite sources when relevant. Be conversational and clear.",
+                            stream=stream,
+                            conversation_history=self.conversation_history
+                        )
+                    elif web_results and results:
+                        # Mix of file and web results
+                        response = self.ollama_manager.chat(
+                            prompt=user_input,
+                            context=context,
+                            system_prompt=f"You are IceNet, the user's personal AI assistant. I've provided both information from the user's files AND web search results above. Use both sources to give a comprehensive answer. The user's file information is their personal data, and the web results provide current/general information. Combine them naturally and helpfully.",
+                            stream=stream,
+                            conversation_history=self.conversation_history
+                        )
                     else:
-                        # Regular query - standard system prompt
+                        # Only file results - standard system prompt
                         response = self.ollama_manager.chat(
                             prompt=user_input,
                             context=context,
