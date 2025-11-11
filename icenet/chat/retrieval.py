@@ -159,27 +159,56 @@ Then I'll be able to answer questions about your files!"""
             })
             return response
 
+        # Check if user is asking about the training data itself
+        meta_keywords = ['files', 'training', 'trained', 'data', 'loaded', 'what do you know',
+                         'what information', 'what have you learned', 'your data', 'my files']
+        is_meta_question = any(keyword in user_input.lower() for keyword in meta_keywords)
+
         # Search for relevant information
         results = self.search(user_input, top_k=3)
 
         # Use Ollama for intelligent responses if available
         if self.use_ollama and self.ollama_manager:
             if not results:
-                # No relevant data - answer as a general AI assistant
-                response = self.ollama_manager.chat(
-                    prompt=user_input,
-                    system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 0)} files from their computer, but this question doesn't seem related to those files. Answer the question normally using your general knowledge. Only mention the training files if the user specifically asks about them or their data."
-                )
-            else:
-                # Build context from search results
-                context = "\n\n---\n\n".join(results)
+                # Check if asking about training data
+                if is_meta_question:
+                    # Provide info about training data
+                    file_list = self.metadata.get('files', [])
+                    file_info = "\n".join([f"- {f}" for f in file_list[:20]])  # Show up to 20 files
 
-                # Get AI response with context
-                response = self.ollama_manager.chat(
-                    prompt=user_input,
-                    context=context,
-                    system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 'some')} files. I've provided some context from those files below. IMPORTANT: Only use this context if it's actually relevant to answering the question. If the question is general knowledge (like 'what year did we land on the moon?' or 'when does it snow?'), answer normally and ignore the file context. If the context IS relevant (like the user asks about their code, documents, or files), then use it to provide a helpful answer. Be conversational and natural."
-                )
+                    response = self.ollama_manager.chat(
+                        prompt=user_input,
+                        context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles:\n{file_info}",
+                        system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided information about the {self.metadata.get('total_files', 0)} files you were trained on. Use this information to answer their question about what files/data you have access to. Be specific and helpful."
+                    )
+                else:
+                    # No relevant data - answer as a general AI assistant
+                    response = self.ollama_manager.chat(
+                        prompt=user_input,
+                        system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 0)} files from their computer, but this question doesn't seem related to those files. Answer the question normally using your general knowledge. Only mention the training files if the user specifically asks about them or their data."
+                    )
+            else:
+                # Check if this is a meta-question even though we have results
+                if is_meta_question and any(word in user_input.lower() for word in ['what files', 'which files', 'my files', 'your files', 'files do', 'list files']):
+                    # User wants to know about the files themselves, not search them
+                    file_list = self.metadata.get('files', [])
+                    file_info = "\n".join([f"- {f}" for f in file_list[:20]])
+
+                    response = self.ollama_manager.chat(
+                        prompt=user_input,
+                        context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles:\n{file_info}",
+                        system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided a list of the {self.metadata.get('total_files', 0)} files you were trained on. Answer their question by telling them about these files. Be specific and helpful."
+                    )
+                else:
+                    # Build context from search results
+                    context = "\n\n---\n\n".join(results)
+
+                    # Get AI response with context
+                    response = self.ollama_manager.chat(
+                        prompt=user_input,
+                        context=context,
+                        system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 'some')} files. I've provided some context from those files below. IMPORTANT: Only use this context if it's actually relevant to answering the question. If the question is general knowledge (like 'what year did we land on the moon?' or 'when does it snow?'), answer normally and ignore the file context. If the context IS relevant (like the user asks about their code, documents, or files), then use it to provide a helpful answer. Be conversational and natural."
+                    )
         else:
             # Fallback: basic responses without AI
             if not results:

@@ -215,6 +215,10 @@ def cmd_train_local(args):
     # Save metadata
     import json
     metadata_file = output_dir / "metadata.json"
+
+    # Get relative file paths for metadata
+    file_paths = [str(f.relative_to(loader.root_path)) for f in files]
+
     with open(metadata_file, 'w') as f:
         json.dump({
             'source_path': str(args.path),
@@ -222,6 +226,7 @@ def cmd_train_local(args):
             'total_chunks': len(chunks),
             'chunk_size': args.chunk_size,
             'statistics': stats,
+            'files': file_paths,  # Add list of files
         }, f, indent=2)
 
     print(f"\n{'=' * 60}")
