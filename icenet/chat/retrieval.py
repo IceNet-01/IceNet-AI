@@ -34,6 +34,7 @@ class RetrievalChatbot:
         self.conversation_id = None
         self.conversations_dir = Path.home() / "icenet" / "conversations"
         self.conversations_dir.mkdir(parents=True, exist_ok=True)
+        self.past_context = None  # Summary of past conversations for natural recall
 
         # Try to load data automatically
         self.load_data()
@@ -217,10 +218,16 @@ Then I'll be able to answer questions about your files!"""
                             conversation_history=self.conversation_history
                         )
                 else:
+                    # Build system prompt with past context awareness
+                    past_info = ""
+                    if self.past_context:
+                        recent_topics_str = ", ".join(self.past_context['recent_topics'][:3])
+                        past_info = f" We've chatted {self.past_context['num_past_conversations']} times before. Recently we discussed: {recent_topics_str}."
+
                     # No relevant data - answer as a general AI assistant
                     response = self.ollama_manager.chat(
                         prompt=user_input,
-                        system_prompt=f"You are IceNet AI, the user's personal AI assistant. IMPORTANT CAPABILITIES: 1) You REMEMBER the current conversation - you have access to the conversation history and can reference what was discussed earlier. 2) Conversations are AUTO-SAVED after each message to ~/icenet/conversations/. 3) The user can load previous conversations with the 'load <id>' command to resume past discussions. 4) You've been trained on {self.metadata.get('total_files', 0)} files from the user's computer. If this question isn't related to those files, answer using your general knowledge. Be helpful and conversational.",
+                        system_prompt=f"You are IceNet, the user's personal AI assistant.{past_info} You remember our current conversation. You have {self.metadata.get('total_files', 0)} of the user's files in your knowledge. This question doesn't seem related to those files, so just answer naturally. Be friendly and conversational - if the user asks about past conversations, you can reference the topics mentioned above naturally.",
                         stream=stream,
                         conversation_history=self.conversation_history
                     )
@@ -257,7 +264,7 @@ Then I'll be able to answer questions about your files!"""
                     response = self.ollama_manager.chat(
                         prompt=user_input,
                         context=context,
-                        system_prompt=f"You are IceNet AI, the user's personal AI assistant. MEMORY: You remember the current conversation and can reference earlier messages. Conversations auto-save and can be resumed later. FILES: You have {self.metadata.get('total_files', 'some')} files from the user's computer, with relevant excerpts provided below. CRITICAL RULES: 1) ONLY state information explicitly in the provided context - DO NOT guess or make up details. 2) If info isn't in excerpts, say 'I don't see that information in the excerpts'. 3) Accept user corrections immediately. 4) These are the USER'S OWN FILES - discuss freely. 5) For general questions, answer normally without forcing file content.",
+                        system_prompt=f"You are IceNet, the user's personal AI assistant. You remember this conversation and can reference what we discussed earlier. You have access to {self.metadata.get('total_files', 'some')} of the user's files. IMPORTANT: 1) Only tell the user things you actually see in their files - don't make stuff up. 2) If you don't see something, just say 'I don't see that in your files' in natural language. 3) These are THEIR files, so discuss them freely and naturally. 4) For general questions unrelated to their files, just answer normally like a helpful assistant. Be conversational and natural - avoid technical jargon.",
                         stream=stream,
                         conversation_history=self.conversation_history
                     )
@@ -432,6 +439,45 @@ Or train me on more files with:
         # Sort by timestamp (newest first)
         conversations.sort(key=lambda x: x['timestamp'], reverse=True)
         return conversations
+
+    def load_past_context(self):
+        """
+        Load context from past conversations to inform current behavior
+        This creates a natural memory without loading full conversation history
+        """
+        conversations = self.list_conversations()
+        if not conversations:
+            self.past_context = None
+            return
+
+        # Get recent conversations (last 5)
+        recent_convs = conversations[:5]
+
+        # Extract key topics and themes
+        topics = []
+        for conv in recent_convs:
+            try:
+                filepath = self.conversations_dir / conv['filename']
+                with open(filepath, 'r') as f:
+                    data = json.load(f)
+                    messages = data.get('messages', [])
+
+                    # Get user questions (good indicators of topics)
+                    user_messages = [m['content'] for m in messages if m['role'] == 'user'][:3]
+                    topics.extend(user_messages)
+            except:
+                continue
+
+        # Build context summary
+        if topics:
+            self.past_context = {
+                'num_past_conversations': len(conversations),
+                'recent_topics': topics[:10],  # Last 10 topics discussed
+                'has_relationship': True
+            }
+            logger.debug(f"Loaded context from {len(conversations)} past conversations")
+        else:
+            self.past_context = None
 
     def get_stats(self) -> Dict:
         """Get statistics about loaded data"""

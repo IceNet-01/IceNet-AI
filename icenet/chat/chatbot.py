@@ -159,9 +159,10 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
     BOT_COLOR = "\033[92m"       # Green for bot
     RESET_COLOR = "\033[0m"      # Reset to default
     BOLD = "\033[1m"             # Bold text
+    DIM = "\033[2m"              # Dim text
 
     print("\n" + "=" * 60)
-    print("IceNet AI Chatbot - Chat About Your Files!")
+    print("IceNet AI - Your Personal Assistant")
     print("=" * 60)
 
     chatbot = SimpleChatbot(model_path=model_path, data_dir=data_dir)
@@ -170,25 +171,26 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
     stats = chatbot.retrieval_bot.get_stats()
 
     if stats['has_data']:
-        print(f"✓ Ready to chat! I have data from {stats['metadata'].get('total_files', '?')} files")
-        print(f"  ({stats['chunks_loaded']} chunks loaded)")
+        print(f"✓ Ready! I have access to {stats['metadata'].get('total_files', '?')} of your files")
 
         # Check if file list is available in metadata
         if not stats['metadata'].get('files'):
-            print(f"\n💡 Tip: Re-train to enable file list viewing:")
-            print(f"  icenet train-local /path/to/your/files --yes")
+            print(f"{DIM}💡 Tip: Re-train to see file names (icenet train-local /path --yes){RESET_COLOR}")
     else:
-        print("⚠ No training data found!")
-        print("  Train me first with: icenet train-local /path/to/files")
-        print("  For example: icenet train-local ~/Documents")
+        print("⚠ No files loaded yet")
+        print("  Train me: icenet train-local ~/Documents")
 
-    print("\nCommands:")
-    print("  'exit' or 'quit' - End the conversation")
-    print("  'clear' - Clear conversation history")
-    print("  'save' - Manually save conversation")
-    print("  'list' - List saved conversations")
-    print("  'load <id>' - Load a previous conversation")
-    print("\n💡 Conversations are automatically saved after each message")
+    # Build context awareness from past conversations
+    conversations = chatbot.retrieval_bot.list_conversations()
+    if conversations:
+        print(f"\n💭 I remember our {len(conversations)} past conversations")
+
+        # Load conversation history context (for AI to reference naturally)
+        chatbot.retrieval_bot.load_past_context()
+    else:
+        print(f"\n👋 Nice to meet you! This is our first conversation.")
+
+    print(f"\n{DIM}Type 'help' for commands or just start chatting{RESET_COLOR}")
     print("=" * 60 + "\n")
 
     while True:
@@ -201,8 +203,18 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
 
             # Handle special commands
             if user_input.lower() in ['exit', 'quit', 'bye']:
-                print(f"\n{BOLD}{BOT_COLOR}Chatbot:{RESET_COLOR} Goodbye! 👋\n")
+                print(f"\n{BOLD}{BOT_COLOR}IceNet:{RESET_COLOR} Goodbye! 👋\n")
                 break
+
+            elif user_input.lower() == 'help':
+                print(f"\n{BOLD}Commands:{RESET_COLOR}")
+                print(f"  {DIM}exit/quit{RESET_COLOR}  - End conversation")
+                print(f"  {DIM}clear{RESET_COLOR}      - Start fresh (clears history)")
+                print(f"  {DIM}save{RESET_COLOR}       - Save conversation manually")
+                print(f"  {DIM}list{RESET_COLOR}       - Show past conversations")
+                print(f"  {DIM}load <id>{RESET_COLOR}  - Resume a conversation\n")
+                print(f"{DIM}💡 Conversations auto-save - just keep chatting!{RESET_COLOR}\n")
+                continue
 
             elif user_input.lower() == 'clear':
                 chatbot.retrieval_bot.clear_history()
@@ -241,7 +253,7 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
                 continue
 
             # Get response with streaming
-            print(f"\n{BOLD}{BOT_COLOR}Chatbot:{RESET_COLOR} ", end='', flush=True)
+            print(f"\n{BOLD}{BOT_COLOR}IceNet:{RESET_COLOR} ", end='', flush=True)
 
             # Stream response in real-time
             response_stream = chatbot.retrieval_bot.chat(user_input, stream=True)
