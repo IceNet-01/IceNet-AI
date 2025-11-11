@@ -220,7 +220,7 @@ Then I'll be able to answer questions about your files!"""
                     # No relevant data - answer as a general AI assistant
                     response = self.ollama_manager.chat(
                         prompt=user_input,
-                        system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 0)} files from their computer, but this question doesn't seem related to those files. Answer the question normally using your general knowledge. Only mention the training files if the user specifically asks about them or their data.",
+                        system_prompt=f"You are IceNet AI, the user's personal AI assistant. IMPORTANT CAPABILITIES: 1) You REMEMBER the current conversation - you have access to the conversation history and can reference what was discussed earlier. 2) Conversations are AUTO-SAVED after each message to ~/icenet/conversations/. 3) The user can load previous conversations with the 'load <id>' command to resume past discussions. 4) You've been trained on {self.metadata.get('total_files', 0)} files from the user's computer. If this question isn't related to those files, answer using your general knowledge. Be helpful and conversational.",
                         stream=stream,
                         conversation_history=self.conversation_history
                     )
@@ -257,7 +257,7 @@ Then I'll be able to answer questions about your files!"""
                     response = self.ollama_manager.chat(
                         prompt=user_input,
                         context=context,
-                        system_prompt=f"You are IceNet AI, the user's personal AI assistant. You have been trained on {self.metadata.get('total_files', 'some')} files from the user's computer. I've provided relevant excerpts from those files below. CRITICAL INSTRUCTIONS: 1) ONLY state information that is explicitly present in the provided context - DO NOT infer, guess, or make up details. 2) If information is not in the excerpts, say 'I don't see that information in the excerpts I have access to'. 3) If the user corrects you about their own files, accept the correction immediately. 4) These are the USER'S OWN FILES - discuss them freely. 5) For general knowledge questions unrelated to files, answer normally.",
+                        system_prompt=f"You are IceNet AI, the user's personal AI assistant. MEMORY: You remember the current conversation and can reference earlier messages. Conversations auto-save and can be resumed later. FILES: You have {self.metadata.get('total_files', 'some')} files from the user's computer, with relevant excerpts provided below. CRITICAL RULES: 1) ONLY state information explicitly in the provided context - DO NOT guess or make up details. 2) If info isn't in excerpts, say 'I don't see that information in the excerpts'. 3) Accept user corrections immediately. 4) These are the USER'S OWN FILES - discuss freely. 5) For general questions, answer normally without forcing file content.",
                         stream=stream,
                         conversation_history=self.conversation_history
                     )
