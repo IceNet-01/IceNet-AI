@@ -124,15 +124,16 @@ class RetrievalChatbot:
         scored_chunks.sort(reverse=True, key=lambda x: x[0])
         return [chunk for _, chunk in scored_chunks[:top_k]]
 
-    def chat(self, user_input: str) -> str:
+    def chat(self, user_input: str, stream: bool = False):
         """
         Generate response to user input
 
         Args:
             user_input: User's message
+            stream: If True, returns generator for streaming output
 
         Returns:
-            Response string
+            Response string (or generator if stream=True)
         """
         # Add to history
         self.conversation_history.append({
@@ -179,13 +180,15 @@ Then I'll be able to answer questions about your files!"""
                     response = self.ollama_manager.chat(
                         prompt=user_input,
                         context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles:\n{file_info}",
-                        system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided information about the {self.metadata.get('total_files', 0)} files you were trained on. Use this information to answer their question about what files/data you have access to. Be specific and helpful."
+                        system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided information about the {self.metadata.get('total_files', 0)} files you were trained on. Use this information to answer their question about what files/data you have access to. Be specific and helpful.",
+                        stream=stream
                     )
                 else:
                     # No relevant data - answer as a general AI assistant
                     response = self.ollama_manager.chat(
                         prompt=user_input,
-                        system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 0)} files from their computer, but this question doesn't seem related to those files. Answer the question normally using your general knowledge. Only mention the training files if the user specifically asks about them or their data."
+                        system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 0)} files from their computer, but this question doesn't seem related to those files. Answer the question normally using your general knowledge. Only mention the training files if the user specifically asks about them or their data.",
+                        stream=stream
                     )
             else:
                 # Check if this is a meta-question even though we have results
@@ -197,7 +200,8 @@ Then I'll be able to answer questions about your files!"""
                     response = self.ollama_manager.chat(
                         prompt=user_input,
                         context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles:\n{file_info}",
-                        system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided a list of the {self.metadata.get('total_files', 0)} files you were trained on. Answer their question by telling them about these files. Be specific and helpful."
+                        system_prompt=f"You are IceNet AI. The user is asking about their training data. I've provided a list of the {self.metadata.get('total_files', 0)} files you were trained on. Answer their question by telling them about these files. Be specific and helpful.",
+                        stream=stream
                     )
                 else:
                     # Build context from search results
@@ -207,7 +211,8 @@ Then I'll be able to answer questions about your files!"""
                     response = self.ollama_manager.chat(
                         prompt=user_input,
                         context=context,
-                        system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 'some')} files. I've provided some context from those files below. IMPORTANT: Only use this context if it's actually relevant to answering the question. If the question is general knowledge (like 'what year did we land on the moon?' or 'when does it snow?'), answer normally and ignore the file context. If the context IS relevant (like the user asks about their code, documents, or files), then use it to provide a helpful answer. Be conversational and natural."
+                        system_prompt=f"You are IceNet AI, a helpful AI assistant. The user has trained you on {self.metadata.get('total_files', 'some')} files. I've provided some context from those files below. IMPORTANT: Only use this context if it's actually relevant to answering the question. If the question is general knowledge (like 'what year did we land on the moon?' or 'when does it snow?'), answer normally and ignore the file context. If the context IS relevant (like the user asks about their code, documents, or files), then use it to provide a helpful answer. Be conversational and natural.",
+                        stream=stream
                     )
         else:
             # Fallback: basic responses without AI
@@ -239,12 +244,39 @@ Or train me on more files with:
                 response += f"\n\n💡 Tip: Install Ollama for intelligent AI responses instead of raw data dumps!"
                 response += f"\n  Run: icenet setup-ollama"
 
+        # Handle streaming vs non-streaming
+        if stream:
+            # Return generator wrapper that collects response for history
+            return self._stream_and_collect(response)
+        else:
+            # Add to history immediately for non-streaming
+            self.conversation_history.append({
+                "role": "assistant",
+                "content": response
+            })
+            return response
+
+    def _stream_and_collect(self, response_generator):
+        """
+        Wrapper that yields from generator and collects full response
+
+        Args:
+            response_generator: Generator yielding response tokens
+
+        Yields:
+            Response tokens
+        """
+        collected = []
+        for token in response_generator:
+            collected.append(token)
+            yield token
+
+        # Add complete response to history
+        full_response = ''.join(collected)
         self.conversation_history.append({
             "role": "assistant",
-            "content": response
+            "content": full_response
         })
-
-        return response
 
     def clear_history(self):
         """Clear conversation history"""

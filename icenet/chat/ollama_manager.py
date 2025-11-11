@@ -213,6 +213,7 @@ class OllamaManager:
         model: Optional[str] = None,
         context: Optional[str] = None,
         system_prompt: Optional[str] = None,
+        stream: bool = False,
     ) -> str:
         """
         Send a chat request to Ollama
@@ -222,9 +223,10 @@ class OllamaManager:
             model: Model to use (default: llama3.2)
             context: Additional context to include
             system_prompt: System prompt for the model
+            stream: If True, yields tokens as they arrive (generator)
 
         Returns:
-            Model's response
+            Model's response (or generator if stream=True)
         """
         model_name = model or self.default_model
 
@@ -247,13 +249,18 @@ Please provide a helpful, accurate response."""
                 json={
                     "model": model_name,
                     "prompt": full_prompt,
-                    "stream": False,
+                    "stream": stream,
                     "system": system_prompt or "You are a helpful AI assistant.",
-                }
+                },
+                stream=stream  # Enable streaming for requests library
             )
 
             if response.status_code == 200:
-                return response.json()['response']
+                if stream:
+                    # Return generator for streaming
+                    return self._stream_response(response)
+                else:
+                    return response.json()['response']
             else:
                 logger.error(f"Ollama API error: {response.status_code}")
                 return "Sorry, I encountered an error. Please try again."
@@ -261,6 +268,29 @@ Please provide a helpful, accurate response."""
         except Exception as e:
             logger.error(f"Chat error: {e}")
             return "Sorry, I couldn't connect to the AI model."
+
+    def _stream_response(self, response):
+        """
+        Generator that yields tokens from streaming response
+
+        Args:
+            response: Streaming response object
+
+        Yields:
+            Text chunks as they arrive
+        """
+        import json
+
+        for line in response.iter_lines():
+            if line:
+                try:
+                    data = json.loads(line)
+                    if 'response' in data:
+                        yield data['response']
+                    if data.get('done', False):
+                        break
+                except json.JSONDecodeError:
+                    continue
 
     def create_fine_tuned_model(
         self,

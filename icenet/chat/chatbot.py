@@ -200,9 +200,42 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
                 print(f"\n[Conversation saved to {filename}]\n")
                 continue
 
-            # Get response
-            response = chatbot.chat(user_input)
-            print(f"\nChatbot: {response}\n")
+            # Get response with streaming
+            print(f"\nChatbot: ", end='', flush=True)
+
+            # Stream response in real-time
+            response_stream = chatbot.retrieval_bot.chat(user_input, stream=True)
+
+            # Handle both streaming and non-streaming responses
+            if hasattr(response_stream, '__iter__') and not isinstance(response_stream, str):
+                # Streaming response - display token by token
+                import sys
+                for token in response_stream:
+                    print(token, end='', flush=True)
+                    sys.stdout.flush()
+                print("\n")  # End with newline
+
+                # Also update SimpleChatbot history
+                full_response = chatbot.retrieval_bot.conversation_history[-1]['content']
+                chatbot.conversation_history.append({
+                    "role": "user",
+                    "content": user_input
+                })
+                chatbot.conversation_history.append({
+                    "role": "assistant",
+                    "content": full_response
+                })
+            else:
+                # Non-streaming fallback
+                print(f"{response_stream}\n")
+                chatbot.conversation_history.append({
+                    "role": "user",
+                    "content": user_input
+                })
+                chatbot.conversation_history.append({
+                    "role": "assistant",
+                    "content": response_stream
+                })
 
         except KeyboardInterrupt:
             print("\n\nChatbot: Goodbye! 👋\n")
