@@ -203,7 +203,7 @@ Then I'll be able to answer questions about your files!"""
                         response = self.ollama_manager.chat(
                             prompt=user_input,
                             context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles (numbered list):\n{file_info}",
-                            system_prompt=f"You are IceNet AI, the user's personal AI assistant. You have been trained on {self.metadata.get('total_files', 0)} files from the user's computer. IMPORTANT: These are the USER'S OWN FILES - you can freely discuss their contents. You have FULL ACCESS to search and read all content from these files in your {len(self.chunks)} training chunks. List the file names clearly with their numbers. Be helpful and informative about what's in these files.",
+                            system_prompt=f"You are IceNet AI, the user's personal AI assistant. You have been trained on {self.metadata.get('total_files', 0)} files from the user's computer. IMPORTANT: These are the USER'S OWN FILES - you can freely discuss their contents. You have FULL ACCESS to search and read all content from these files in your {len(self.chunks)} training chunks. CRITICAL: Only state facts you can verify from the file contents - DO NOT make up details about the files. If you don't know something about a file, say so. List the file names clearly with their numbers.",
                             stream=stream,
                             conversation_history=self.conversation_history
                         )
@@ -236,7 +236,7 @@ Then I'll be able to answer questions about your files!"""
                         response = self.ollama_manager.chat(
                             prompt=user_input,
                             context=f"Training data info:\n- Total files: {self.metadata.get('total_files', 0)}\n- Total chunks: {len(self.chunks)}\n\nFiles (numbered list):\n{file_info}",
-                            system_prompt=f"You are IceNet AI, the user's personal AI assistant. These are the USER'S OWN FILES from their computer - you can freely discuss their contents without any privacy concerns. You have FULL ACCESS to search and read all {len(self.chunks)} chunks of content from these {self.metadata.get('total_files', 0)} files. When the user asks about a specific file (by name or number), search your training data and provide helpful information about what's in it. Be specific and helpful.",
+                            system_prompt=f"You are IceNet AI, the user's personal AI assistant. These are the USER'S OWN FILES from their computer - you can freely discuss their contents without any privacy concerns. You have FULL ACCESS to search and read all {len(self.chunks)} chunks of content from these {self.metadata.get('total_files', 0)} files. CRITICAL: Only state information that is explicitly present in the file contents - DO NOT make up or infer details. If you don't see specific information (like author, date, etc.) in the excerpts, say so. When the user corrects you, accept it immediately. Be specific and helpful based on what's actually in the files.",
                             stream=stream,
                             conversation_history=self.conversation_history
                         )
@@ -257,7 +257,7 @@ Then I'll be able to answer questions about your files!"""
                     response = self.ollama_manager.chat(
                         prompt=user_input,
                         context=context,
-                        system_prompt=f"You are IceNet AI, the user's personal AI assistant. You have been trained on {self.metadata.get('total_files', 'some')} files from the user's computer. I've provided relevant excerpts from those files below. IMPORTANT: These are the USER'S OWN PRIVATE FILES - you can freely discuss their contents. Only use the file context if it's relevant to the question. For general knowledge questions (like 'what year did we land on the moon?'), answer normally and ignore the file context. When discussing file contents, be helpful, specific, and informative. No privacy restrictions apply to the user's own files.",
+                        system_prompt=f"You are IceNet AI, the user's personal AI assistant. You have been trained on {self.metadata.get('total_files', 'some')} files from the user's computer. I've provided relevant excerpts from those files below. CRITICAL INSTRUCTIONS: 1) ONLY state information that is explicitly present in the provided context - DO NOT infer, guess, or make up details. 2) If information is not in the excerpts, say 'I don't see that information in the excerpts I have access to'. 3) If the user corrects you about their own files, accept the correction immediately. 4) These are the USER'S OWN FILES - discuss them freely. 5) For general knowledge questions unrelated to files, answer normally.",
                         stream=stream,
                         conversation_history=self.conversation_history
                     )
