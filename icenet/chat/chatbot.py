@@ -180,15 +180,15 @@ def run_chat_loop(model_path: Optional[str] = None, data_dir: str = "~/icenet/tr
         print("⚠ No files loaded yet")
         print("  Train me: icenet train-local ~/Documents")
 
-    # Build context awareness from past conversations
+    # Check for previous conversations
     conversations = chatbot.retrieval_bot.list_conversations()
-    if conversations:
-        print(f"\n💭 I remember our {len(conversations)} past conversations")
-
-        # Load conversation history context (for AI to reference naturally)
-        chatbot.retrieval_bot.load_past_context()
+    if conversations and len(conversations) > 1:
+        print(f"\n💬 We've chatted before ({len(conversations)} past conversations)")
+        print(f"{DIM}   Type 'list' to see them or 'load <id>' to resume one{RESET_COLOR}")
+    elif conversations and len(conversations) == 1:
+        print(f"\n💬 This is our second conversation")
     else:
-        print(f"\n👋 Nice to meet you! This is our first conversation.")
+        print(f"\n👋 Nice to meet you! This is our first conversation")
 
     print(f"\n{DIM}Type 'help' for commands or just start chatting{RESET_COLOR}")
     print("=" * 60 + "\n")

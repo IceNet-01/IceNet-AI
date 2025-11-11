@@ -218,16 +218,10 @@ Then I'll be able to answer questions about your files!"""
                             conversation_history=self.conversation_history
                         )
                 else:
-                    # Build system prompt with past context awareness
-                    past_info = ""
-                    if self.past_context:
-                        recent_topics_str = ", ".join(self.past_context['recent_topics'][:3])
-                        past_info = f" BACKGROUND INFO: We've chatted {self.past_context['num_past_conversations']} times before about topics like: {recent_topics_str}. IMPORTANT: Only mention these past topics if the user EXPLICITLY asks about them (e.g., 'what did we discuss before?'). Otherwise, just respond naturally to their current message."
-
                     # No relevant data - answer as a general AI assistant
                     response = self.ollama_manager.chat(
                         prompt=user_input,
-                        system_prompt=f"You are IceNet, the user's personal AI assistant.{past_info} You remember our current conversation and can recall what the user tells you in THIS conversation. If the user shares information about themselves (like their background, job, preferences), acknowledge it and remember it for later in THIS conversation. Be friendly, conversational, and responsive to what they're actually saying right now.",
+                        system_prompt=f"You are IceNet, the user's personal AI assistant. You remember THIS conversation (you can see the conversation history above). If the user shares information about themselves, acknowledge it and remember it for THIS conversation. Each time the user starts the chat app, it's a new conversation - you don't have memories from previous sessions unless the user explicitly loads a past conversation. Be friendly, natural, and focus on what the user is saying right now.",
                         stream=stream,
                         conversation_history=self.conversation_history
                     )
@@ -264,7 +258,7 @@ Then I'll be able to answer questions about your files!"""
                     response = self.ollama_manager.chat(
                         prompt=user_input,
                         context=context,
-                        system_prompt=f"You are IceNet, the user's personal AI assistant. You remember THIS conversation (the messages in our current chat). You have access to {self.metadata.get('total_files', 'some')} of the user's files. IMPORTANT: 1) Only tell the user things you actually see in their files - don't make stuff up. 2) If you don't see something, just say 'I don't see that in your files' naturally. 3) These are THEIR files, discuss them freely. 4) If the user shares personal information (like background, job, etc.), acknowledge it naturally and remember it for this conversation. Focus on what the user is saying RIGHT NOW.",
+                        system_prompt=f"You are IceNet, the user's personal AI assistant. You remember THIS conversation only. You have {self.metadata.get('total_files', 'some')} of the user's files and I've found relevant excerpts above. Only tell the user what you actually see in those excerpts - don't make things up. If info isn't there, say so naturally. Be helpful and conversational.",
                         stream=stream,
                         conversation_history=self.conversation_history
                     )
